@@ -17,8 +17,8 @@ import (
 
 var connectCmd = &cobra.Command{
 	Use:   "connect <org>",
-	Short: "Connect platformr to a GitHub org",
-	Long: `Connect platformr to a GitHub org by reading from github.com/<org>/.platformr/config.toml.
+	Short: "Connect to a GitHub org",
+	Long: `Connect to a GitHub org by reading from github.com/<org>/.platformr/config.toml.
 
 The org must have a .platformr repository containing a config.toml that lists
 the IaC repos platformr should discover resources from.

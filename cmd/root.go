@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/charmbracelet/log"
 	"github.com/devops-chris/platformr/internal/config"
@@ -12,15 +13,19 @@ import (
 var localCfg *config.LocalConfig
 
 var rootCmd = &cobra.Command{
-	Use:   "platformr",
 	Short: "Developer self-service platform CLI",
-	Long: `platformr is a configurable self-service CLI for developers to
-request infrastructure and services via GitOps pull requests.
-
-Run 'platformr connect <org>' to get started.`,
 }
 
 func Execute() {
+	// Use the actual binary name so orgs can distribute under any name
+	// (e.g. pt-platform, devops) and all help text reflects it automatically.
+	name := filepath.Base(os.Args[0])
+	rootCmd.Use = name
+	rootCmd.Long = name + ` is a configurable self-service CLI for developers to
+request infrastructure and services via GitOps pull requests.
+
+Run '` + name + ` connect <org>' to get started.`
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

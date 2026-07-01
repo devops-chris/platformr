@@ -13,7 +13,7 @@ import (
 
 var authCmd = &cobra.Command{
 	Use:   "auth",
-	Short: "Authorize platformr to open pull requests on your behalf",
+	Short: "Authorize the CLI to open pull requests on your behalf",
 	Long: `Runs a GitHub App device flow to authorize platformr to create branches
 and pull requests against your org's IaC repos.
 
