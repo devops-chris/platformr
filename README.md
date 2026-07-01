@@ -16,8 +16,7 @@ platformr request
 
 1. Developer runs `platformr request` and picks a resource type (service, database, VPC, etc.)
 2. CLI prompts for the required fields interactively
-3. Checks the target repo for conflicts — won't create a duplicate
-4. Opens a PR against the appropriate IaC repo with a rendered template
+3. Opens a PR against the appropriate IaC repo with a rendered template
 5. Your existing CI/CD (ArgoCD, Flux, Terraform Cloud) applies it as normal
 
 Resource types, templates, and target repos are entirely defined by your platform
