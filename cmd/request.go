@@ -16,10 +16,16 @@ import (
 )
 
 var requestCmd = &cobra.Command{
-	Use:   "request",
+	Use:   "request [resource]",
 	Short: "Request a new resource",
-	Long:  `Interactively request a new infrastructure resource or service via a GitOps PR.`,
-	RunE:  runRequest,
+	Long: `Interactively request a new infrastructure resource or service via a GitOps PR.
+
+Optionally specify the resource type directly to skip the picker:
+
+  platformr request eks
+  platformr request vpc`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: runRequest,
 }
 
 func init() {
@@ -62,13 +68,29 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	}
 
 	// Pick resource type
-	resource, err := pickResource(allResources)
-	if err != nil {
-		return err
+	var resource config.Resource
+	if len(args) == 1 {
+		found, ok := remote.FindResource(args[0], repos)
+		if !ok {
+			return fmt.Errorf("resource %q not found — run `platformr catalog` to see available resources", args[0])
+		}
+		resource = found
+	} else {
+		var err error
+		resource, err = pickResource(allResources)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Collect field values
 	values, err := collectFields(resource, repos, gh, ghWrite)
+	if err != nil {
+		return err
+	}
+
+	// Prompt for optional PR comment
+	comment, err := ui.PromptComment()
 	if err != nil {
 		return err
 	}
@@ -142,6 +164,20 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Build reviewer lists: config-driven + any type="reviewer" / type="team_reviewer" fields
+	reviewers := append([]string(nil), resource.Reviewers...)
+	teamReviewers := append([]string(nil), resource.TeamReviewers...)
+	for _, f := range resource.Fields {
+		if v := values[f.Name]; v != "" {
+			switch f.Type {
+			case "reviewer":
+				reviewers = append(reviewers, v)
+			case "team_reviewer":
+				teamReviewers = append(teamReviewers, v)
+			}
+		}
+	}
+
 	// Open PR
 	var prURL string
 	var prErr error
@@ -149,12 +185,14 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		Title("Opening PR...").
 		Action(func() {
 			prURL, prErr = ghWrite.CreatePR(ghclient.PRRequest{
-				Repo:       resource.Resolved.Repo,
-				Branch:     fmt.Sprintf("platformr/%s-%s", resource.Name, resolveSlug(resource, values)),
-				BaseBranch: resource.Resolved.BaseBranch,
-				Title:      template.RenderString(resource.PRTitle, values),
-				Body:       buildPRBody(resource.Name, values),
-				Files:      prFiles,
+				Repo:          resource.Resolved.Repo,
+				Branch:        fmt.Sprintf("platformr/%s-%s", resource.Name, resolveSlug(resource, values)),
+				BaseBranch:    resource.Resolved.BaseBranch,
+				Title:         template.RenderString(resource.PRTitle, values),
+				Body:          buildPRBody(resource.Name, values, comment),
+				Files:         prFiles,
+				Reviewers:     reviewers,
+				TeamReviewers: teamReviewers,
 			})
 		}).
 		Run()
@@ -271,7 +309,7 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 						Branch:     fmt.Sprintf("platformr/%s-%s", depResource.Name, resolveSlug(depResource, depValues)),
 						BaseBranch: depResource.Resolved.BaseBranch,
 						Title:      template.RenderString(depResource.PRTitle, depValues),
-						Body:       buildPRBody(depResource.Name, depValues),
+						Body:       buildPRBody(depResource.Name, depValues, ""),
 						Files:      depFiles,
 					})
 				}).
@@ -392,10 +430,13 @@ func copyMap(m map[string]string) map[string]string {
 	return out
 }
 
-func buildPRBody(resourceName string, values map[string]string) string {
+func buildPRBody(resourceName string, values map[string]string, comment string) string {
 	body := fmt.Sprintf("## %s request\n\nOpened via `platformr`\n\n### Details\n\n", resourceName)
 	for k, v := range values {
 		body += fmt.Sprintf("- **%s**: %s\n", k, v)
+	}
+	if comment != "" {
+		body += fmt.Sprintf("\n### Notes\n\n%s\n", comment)
 	}
 	return body
 }

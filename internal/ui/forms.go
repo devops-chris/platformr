@@ -107,6 +107,18 @@ func resolveOptions(field config.Field, ctx *FieldContext) ([]string, error) {
 	return ctx.ListFiles("", "")
 }
 
+// PromptComment prompts for an optional freeform note to append to the PR body.
+func PromptComment() (string, error) {
+	var val string
+	if err := huh.NewInput().
+		Title("Additional notes for the PR? (optional, Enter to skip)").
+		Value(&val).
+		Run(); err != nil {
+		return "", err
+	}
+	return val, nil
+}
+
 func toHuhOptions(vals []string) []huh.Option[string] {
 	opts := make([]huh.Option[string], len(vals))
 	for i, v := range vals {

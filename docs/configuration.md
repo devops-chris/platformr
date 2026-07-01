@@ -185,6 +185,58 @@ Both `platformr request` and `platformr catalog` group and label by category.
 
 ---
 
+## Reviewers & PR comments
+
+### Auto-reviewers (config-driven)
+
+Add `reviewers` and/or `team_reviewers` to a resource definition to automatically
+request review on every PR for that resource type. Developers are never prompted —
+the assignment happens silently when the PR is created.
+
+```toml
+[[resources]]
+name           = "eks"
+description    = "Request a new EKS cluster"
+reviewers      = ["alice"]          # GitHub usernames
+team_reviewers = ["platform-team"]  # GitHub team slugs
+```
+
+### Selectable reviewers (developer-chosen)
+
+For cases where the developer needs to tag someone they're working with, add a
+field with `type = "reviewer"` or `type = "team_reviewer"`. It renders as a
+select during the request flow, and the chosen value is added to the PR's reviewer
+list in addition to any config-driven reviewers above.
+
+```toml
+[[resources.fields]]
+name     = "reviewer"
+type     = "reviewer"
+label    = "Tag someone to review with? (optional)"
+options  = ["alice", "bob", "carol"]
+optional = true
+```
+
+Use `type = "team_reviewer"` to assign a team instead of an individual.
+
+The selected value is also available as `{{.reviewer}}` in templates if needed.
+
+### PR comments
+
+At the end of every `platformr request` flow, developers are prompted for optional
+freeform notes. Pressing Enter skips it. If provided, the text is appended to the
+PR body under a **Notes** heading:
+
+```
+### Notes
+
+needs to land before the RDS migration on Friday
+```
+
+No configuration required — this prompt appears on all resource types.
+
+---
+
 ## Fields
 
 ### Field types

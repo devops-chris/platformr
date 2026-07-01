@@ -47,14 +47,16 @@ type TemplateFile struct {
 }
 
 type PRRequest struct {
-	Repo       string
-	Branch     string
-	BaseBranch string
-	Title      string
-	Body       string
-	Files      []PRFile // multi-file commit (use this or FilePath/Content)
-	FilePath   string   // single-file legacy
-	Content    string   // single-file legacy
+	Repo          string
+	Branch        string
+	BaseBranch    string
+	Title         string
+	Body          string
+	Files         []PRFile // multi-file commit (use this or FilePath/Content)
+	FilePath      string   // single-file legacy
+	Content       string   // single-file legacy
+	Reviewers     []string // GitHub usernames to request review from
+	TeamReviewers []string // GitHub team slugs to request review from
 }
 
 // FetchFile fetches the raw string content of a file from a GitHub repo.
@@ -283,6 +285,17 @@ func (c *Client) openPR(ctx context.Context, owner, repo, baseBranch string, req
 	if err != nil {
 		return "", fmt.Errorf("creating pull request: %w", err)
 	}
+
+	if len(req.Reviewers) > 0 || len(req.TeamReviewers) > 0 {
+		_, _, err = c.client.PullRequests.RequestReviewers(ctx, owner, repo, pr.GetNumber(), gh.ReviewersRequest{
+			Reviewers:     req.Reviewers,
+			TeamReviewers: req.TeamReviewers,
+		})
+		if err != nil {
+			return pr.GetHTMLURL(), fmt.Errorf("PR created but reviewer assignment failed: %w", err)
+		}
+	}
+
 	return pr.GetHTMLURL(), nil
 }
 

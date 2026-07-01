@@ -59,8 +59,10 @@ type Resource struct {
 	FileName    string  `toml:"file_name"`    // supports {{.field}} interpolation, e.g. "{{.vpc_name}}". defaults to first field value
 	FileExt     string  `toml:"file_ext"`     // e.g. ".tf", ".tfvars", ".yaml". defaults to ".yaml"
 	BaseBranch  string  `toml:"base_branch"`
-	PRTitle     string  `toml:"pr_title"`
-	Fields      []Field `toml:"fields"`
+	PRTitle      string   `toml:"pr_title"`
+	Reviewers    []string `toml:"reviewers"`      // GitHub usernames auto-requested on every PR for this resource
+	TeamReviewers []string `toml:"team_reviewers"` // GitHub team slugs auto-requested on every PR for this resource
+	Fields       []Field  `toml:"fields"`
 	// Resolved is populated by the resolver after loading. Do not set in TOML.
 	Resolved ResolvedResource `toml:"-"`
 }
