@@ -391,6 +391,35 @@ source = "dirs:cloud/aws"   # lists subdirectories of cloud/aws/ at request time
 The directory list is fetched live from the same branch the templates are read from
 (controlled by `ref` in the org config).
 
+The path supports `{{.field}}` expressions referencing **previously collected fields**,
+enabling dependent (chained) selects:
+
+```toml
+[[resources.fields]]
+name   = "account"
+type   = "select"
+source = "dirs:cloud/aws"
+
+[[resources.fields]]
+name   = "region"
+type   = "select"
+options = ["use1", "usw2"]
+
+[[resources.fields]]
+name   = "cluster"
+type   = "select"
+source = "dirs:cloud/aws/{{.account}}/{{.region}}"   # resolved using prior answers
+
+[[resources.fields]]
+name         = "project"
+type         = "select"
+source       = "dirs:cloud/aws/{{.account}}/{{.region}}/{{.cluster}}"
+strip_prefix = "platform-"
+```
+
+Fields are resolved in order — a `{{.field}}` expression is only valid if that field
+appears earlier in the list.
+
 ### Field validation
 
 ```toml

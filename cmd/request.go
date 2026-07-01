@@ -242,7 +242,7 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 	values := make(map[string]string)
 
 	for _, field := range resource.Fields {
-		ctx := buildFieldContext(field, resource, repos, gh)
+		ctx := buildFieldContext(field, resource, repos, gh, values)
 
 		val, err := ui.PromptField(field, values, ctx)
 		if err != nil {
@@ -350,7 +350,7 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 	return values, nil
 }
 
-func buildFieldContext(field config.Field, resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client) *ui.FieldContext {
+func buildFieldContext(field config.Field, resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, values map[string]string) *ui.FieldContext {
 	if field.Source == "" {
 		return &ui.FieldContext{
 			ListFiles: func(_, _ string) ([]string, error) { return field.Options, nil },
@@ -358,7 +358,7 @@ func buildFieldContext(field config.Field, resource config.Resource, repos []*co
 	}
 
 	if strings.HasPrefix(field.Source, "dirs:") {
-		dirPath := strings.TrimPrefix(field.Source, "dirs:")
+		dirPath := template.RenderString(strings.TrimPrefix(field.Source, "dirs:"), values)
 		return &ui.FieldContext{
 			ListFiles: func(_, _ string) ([]string, error) {
 				return gh.ListDirs(resource.Resolved.TemplateRepo, dirPath, resource.Resolved.TemplateRef)
