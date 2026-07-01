@@ -157,6 +157,52 @@ func (c *Client) ListDirs(repo, path, ref string) ([]string, error) {
 	return names, nil
 }
 
+// ListTeamMembers returns the GitHub login names of all members of a team.
+func (c *Client) ListTeamMembers(org, teamSlug string) ([]string, error) {
+	ctx := context.Background()
+	var logins []string
+	opts := &gh.TeamListTeamMembersOptions{ListOptions: gh.ListOptions{PerPage: 100}}
+	for {
+		members, resp, err := c.client.Teams.ListTeamMembersBySlug(ctx, org, teamSlug, opts)
+		if err != nil {
+			return nil, fmt.Errorf("listing members of team %s/%s: %w", org, teamSlug, err)
+		}
+		for _, m := range members {
+			logins = append(logins, m.GetLogin())
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return logins, nil
+}
+
+// ListCollaborators returns the GitHub login names of all collaborators on a repo.
+func (c *Client) ListCollaborators(repo string) ([]string, error) {
+	owner, repoName, err := parseRepo(repo)
+	if err != nil {
+		return nil, err
+	}
+	ctx := context.Background()
+	var logins []string
+	opts := &gh.ListCollaboratorsOptions{ListOptions: gh.ListOptions{PerPage: 100}}
+	for {
+		collabs, resp, err := c.client.Repositories.ListCollaborators(ctx, owner, repoName, opts)
+		if err != nil {
+			return nil, fmt.Errorf("listing collaborators of %s: %w", repo, err)
+		}
+		for _, col := range collabs {
+			logins = append(logins, col.GetLogin())
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return logins, nil
+}
+
 // FileExists checks whether a file already exists at the given path in the repo.
 func (c *Client) FileExists(repo, path string) (bool, error) {
 	owner, repoName, err := parseRepo(repo)

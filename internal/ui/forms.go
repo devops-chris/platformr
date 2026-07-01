@@ -96,7 +96,10 @@ func resolveOptions(field config.Field, ctx *FieldContext) ([]string, error) {
 	if field.Source == "" {
 		return field.Options, nil
 	}
-	if !strings.HasPrefix(field.Source, "resource.") && !strings.HasPrefix(field.Source, "dirs:") {
+	if !strings.HasPrefix(field.Source, "resource.") &&
+		!strings.HasPrefix(field.Source, "dirs:") &&
+		!strings.HasPrefix(field.Source, "team:") &&
+		field.Source != "collaborators" {
 		return nil, fmt.Errorf("unknown source %q", field.Source)
 	}
 	if ctx == nil || ctx.ListFiles == nil {

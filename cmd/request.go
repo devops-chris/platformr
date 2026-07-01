@@ -366,6 +366,23 @@ func buildFieldContext(field config.Field, resource config.Resource, repos []*co
 		}
 	}
 
+	if strings.HasPrefix(field.Source, "team:") {
+		teamSlug := strings.TrimPrefix(field.Source, "team:")
+		return &ui.FieldContext{
+			ListFiles: func(_, _ string) ([]string, error) {
+				return gh.ListTeamMembers(resource.Resolved.Org, teamSlug)
+			},
+		}
+	}
+
+	if field.Source == "collaborators" {
+		return &ui.FieldContext{
+			ListFiles: func(_, _ string) ([]string, error) {
+				return gh.ListCollaborators(resource.Resolved.Repo)
+			},
+		}
+	}
+
 	if !strings.HasPrefix(field.Source, "resource.") {
 		return &ui.FieldContext{
 			ListFiles: func(_, _ string) ([]string, error) { return field.Options, nil },

@@ -208,16 +208,35 @@ field with `type = "reviewer"` or `type = "team_reviewer"`. It renders as a
 select during the request flow, and the chosen value is added to the PR's reviewer
 list in addition to any config-driven reviewers above.
 
+The options list can be static or dynamically sourced:
+
 ```toml
+# Static list
 [[resources.fields]]
 name     = "reviewer"
 type     = "reviewer"
 label    = "Tag someone to review with? (optional)"
 options  = ["alice", "bob", "carol"]
 optional = true
+
+# Dynamic — fetched from a GitHub team at request time
+[[resources.fields]]
+name     = "reviewer"
+type     = "reviewer"
+label    = "Tag someone to review with? (optional)"
+source   = "team:devops-team"   # slug of a team in your org
+optional = true
+
+# Dynamic — fetched from the PR target repo's collaborators
+[[resources.fields]]
+name     = "reviewer"
+type     = "reviewer"
+label    = "Tag someone to review with? (optional)"
+source   = "collaborators"
+optional = true
 ```
 
-Use `type = "team_reviewer"` to assign a team instead of an individual.
+Use `type = "team_reviewer"` to assign a GitHub team instead of an individual.
 
 The selected value is also available as `{{.reviewer}}` in templates if needed.
 
