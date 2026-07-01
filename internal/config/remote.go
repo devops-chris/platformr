@@ -49,6 +49,7 @@ type RepoConfig struct {
 
 type Resource struct {
 	Name        string  `toml:"name"`
+	Category    string  `toml:"category"`     // optional grouping label shown in picker and catalog
 	Description string  `toml:"description"`
 	Template    string  `toml:"template"`     // path within this repo, e.g. "platformr/templates/service.yaml.tmpl"
 	TemplateDir string  `toml:"template_dir"` // directory of .tmpl files — all rendered and committed (takes precedence over template)
@@ -80,10 +81,11 @@ type Field struct {
 	Name        string   `toml:"name"`
 	Type        string   `toml:"type"`         // "input" or "select"
 	Label       string   `toml:"label"`
-	Source      string   `toml:"source"`       // "resource.<type>" — discovers existing resources
+	Source      string   `toml:"source"`       // "resource.<type>" or "dirs:<path>" — dynamic options
 	AllowCreate bool     `toml:"allow_create"` // offer "[+ create new]" when sourcing from another resource
 	Options     []string `toml:"options"`      // static options for select
 	Default     string   `toml:"default"`
 	Validate    string   `toml:"validate"`     // "unique" — checks target repo for conflicts
 	Placeholder string   `toml:"placeholder"`
+	Optional    bool     `toml:"optional"`     // if true, field may be left blank; use {{if .field}} in templates
 }

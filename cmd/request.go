@@ -93,7 +93,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 						tmplErr = fmt.Errorf("rendering %s: %w", tf.Name, err)
 						return
 					}
-					outName := strings.TrimSuffix(tf.Name, ".tmpl")
+					outName := template.RenderString(strings.TrimSuffix(tf.Name, ".tmpl"), values)
 					prFiles = append(prFiles, ghclient.PRFile{
 						Path:    targetPath + outName,
 						Content: rendered,
@@ -168,12 +168,19 @@ func runRequest(cmd *cobra.Command, args []string) error {
 }
 
 func pickResource(allResources []config.Resource) (config.Resource, error) {
-	opts := make([]huh.Option[string], len(allResources))
-	for i, r := range allResources {
-		opts[i] = huh.NewOption(
-			fmt.Sprintf("%-16s %s", r.Name, ui.Subtle(r.Description)),
-			r.Name,
-		)
+	var opts []huh.Option[string]
+	currentCategory := ""
+	for _, r := range allResources {
+		cat := r.Category
+		if cat == "" {
+			cat = "General"
+		}
+		label := fmt.Sprintf("%-16s %s", r.Name, ui.Subtle(r.Description))
+		if cat != currentCategory {
+			currentCategory = cat
+			label = fmt.Sprintf("%-16s %s  [%s]", r.Name, ui.Subtle(r.Description), cat)
+		}
+		opts = append(opts, huh.NewOption(label, r.Name))
 	}
 
 	var selected string

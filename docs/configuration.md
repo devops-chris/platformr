@@ -131,6 +131,22 @@ Every `.tmpl` file in the directory is fetched, rendered, and committed.
 The output filename is the template name with `.tmpl` stripped
 (e.g. `vpc.tf.tmpl` → `vpc.tf`).
 
+### Templated output filenames
+
+Template filenames themselves support `{{.field}}` expressions, rendered at
+request time. This is useful when multiple deployments of the same resource
+type land in the same directory and need unique filenames:
+
+```
+platformr/templates/eks/
+├── eks-{{.name}}.tf.tmpl        → eks-services.tf
+├── labels-{{.name}}.tf.tmpl     → labels-services.tf
+└── terragrunt.hcl.tmpl          → terragrunt.hcl
+```
+
+Files without template expressions in the name are unaffected — `terragrunt.hcl.tmpl`
+always outputs `terragrunt.hcl`.
+
 ### Template conditionals in paths
 
 `target_path` and `pr_title` support full Go `text/template` syntax, including
@@ -148,14 +164,57 @@ pr_title    = 'feat(vpc): add {{.name}} in {{.account}}/{{if ne .environment "pr
 
 ---
 
+## Resource categories
+
+Resources can be grouped with `category` for a tidier picker and catalog:
+
+```toml
+[[resources]]
+name        = "vpc"
+category    = "Infrastructure"
+description = "Request a new VPC"
+
+[[resources]]
+name        = "scale-nodes"
+category    = "2nd Day Operations"
+description = "Scale a node group"
+```
+
+Resources without `category` are grouped under **General**.
+Both `platformr request` and `platformr catalog` group and label by category.
+
+---
+
 ## Fields
 
 ### Field types
 
 | type | behaviour |
 |---|---|
-| `input` | Free-text input. Supports `default`, `placeholder`, and `validate`. |
-| `select` | Dropdown. Populated from `options` (static) or `source` (dynamic). |
+| `input` | Free-text input. Supports `default`, `placeholder`, `validate`, and `optional`. |
+| `select` | Dropdown. Populated from `options` (static) or `source` (dynamic). Supports `optional`. |
+
+### Optional fields
+
+Mark a field `optional = true` to allow it to be left blank. Input fields show
+an `(optional)` label; select fields show a `— skip —` option at the top.
+Use `{{if .field}}...{{end}}` in templates to omit blocks when the field is empty:
+
+```toml
+[[resources.fields]]
+name     = "annotations"
+type     = "input"
+label    = "Extra annotations"
+optional = true
+```
+
+```hcl
+# In the template — block only appears if annotations was filled in
+{{if .annotations}}
+  annotations:
+    note: "{{.annotations}}"
+{{end}}
+```
 
 ### Input defaults and placeholders
 

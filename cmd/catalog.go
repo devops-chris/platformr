@@ -76,18 +76,22 @@ func runCatalog(cmd *cobra.Command, args []string) error {
 func printResourceList(resources []config.Resource, repos []*config.RepoConfig) error {
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"})
 	nameStyle := lipgloss.NewStyle().Bold(true).Width(16)
-	repoStyle := lipgloss.NewStyle().Faint(true)
+	categoryStyle := lipgloss.NewStyle().Bold(true).Faint(true)
 
 	fmt.Printf("\n  %s — %s\n\n",
 		headerStyle.Render("platformr catalog"),
 		ui.Subtle(localCfg.ConnectedOrg),
 	)
 
-	currentRepo := ""
+	currentCategory := ""
 	for _, r := range resources {
-		if r.Resolved.Repo != currentRepo {
-			currentRepo = r.Resolved.Repo
-			fmt.Printf("  %s\n", repoStyle.Render("→ "+currentRepo))
+		cat := r.Category
+		if cat == "" {
+			cat = "General"
+		}
+		if cat != currentCategory {
+			currentCategory = cat
+			fmt.Printf("  %s\n", categoryStyle.Render(cat))
 		}
 		fmt.Printf("    %s %s\n",
 			nameStyle.Render(r.Name),
@@ -96,7 +100,7 @@ func printResourceList(resources []config.Resource, repos []*config.RepoConfig) 
 	}
 
 	fmt.Printf("\n  %s\n\n",
-		ui.Subtle(fmt.Sprintf("Run `platformr catalog <name>` for field details.")),
+		ui.Subtle("Run `platformr catalog <name>` for field details."),
 	)
 	return nil
 }

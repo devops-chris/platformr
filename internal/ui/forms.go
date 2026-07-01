@@ -40,6 +40,10 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 		return promptInput(label, field)
 	}
 
+	if field.Optional {
+		options = append([]string{"— skip —"}, options...)
+	}
+
 	if field.AllowCreate {
 		options = append(options, CreateNewOption)
 	}
@@ -57,6 +61,9 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 		Run(); err != nil {
 		return "", err
 	}
+	if val == "— skip —" {
+		return "", nil
+	}
 	return val, nil
 }
 
@@ -65,11 +72,19 @@ func promptInput(label string, field config.Field) (string, error) {
 	if val == "" {
 		val = field.Placeholder
 	}
+	l := label
+	if field.Optional {
+		l = label + " (optional)"
+	}
 	if err := huh.NewInput().
-		Title(label).
+		Title(l).
 		Value(&val).
 		Run(); err != nil {
 		return "", err
+	}
+	// For optional fields, treat the placeholder value as "not set" if unchanged
+	if field.Optional && val == field.Placeholder {
+		return "", nil
 	}
 	return val, nil
 }
