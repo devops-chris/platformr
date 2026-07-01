@@ -1,0 +1,13 @@
+apiVersion: platform.example.com/v1alpha1
+kind: ServiceClaim
+metadata:
+  name: {{.name}}
+  namespace: {{.project}}
+  labels:
+    platform.example.com/project: {{.project}}
+    platform.example.com/environment: {{.environment}}
+    platform.example.com/managed-by: platformr
+spec:
+  language: {{.language}}
+  environment: {{.environment}}
+  project: {{.project}}

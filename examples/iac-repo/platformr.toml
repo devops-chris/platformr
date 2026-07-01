@@ -1,0 +1,53 @@
+# acme-corp/platform-claims/platformr.toml
+#
+# This file lives in the root of an IaC repo alongside the IaC it describes.
+# Templates live at platformr/templates/ within the same repo.
+# Adding a new resource type = add an entry here + a template file, in the same PR.
+
+[defaults]
+target_path   = "claims/{{.resource}}/"
+template_path = "platformr/templates/{{.resource}}.yaml.tmpl"
+base_branch   = "main"
+
+[[resources]]
+name        = "project"
+description = "Create a new platform project"
+pr_title    = "feat(project): add {{.name}}"
+
+  [[resources.fields]]
+  name        = "name"
+  type        = "input"
+  label       = "Project name"
+  placeholder = "payments"
+  validate    = "unique"
+
+[[resources]]
+name        = "service"
+description = "Create a new microservice"
+pr_title    = "feat(service): add {{.name}}"
+
+  [[resources.fields]]
+  name         = "project"
+  type         = "select"
+  label        = "Select project"
+  source       = "resource.project"   # discovers existing projects from claims/project/
+  allow_create = true                 # offers [+ create new] if none exist
+
+  [[resources.fields]]
+  name        = "name"
+  type        = "input"
+  label       = "Service name"
+  placeholder = "payments-worker"
+  validate    = "unique"
+
+  [[resources.fields]]
+  name    = "language"
+  type    = "select"
+  label   = "Language"
+  options = ["go", "typescript", "python", "java"]
+
+  [[resources.fields]]
+  name    = "environment"
+  type    = "select"
+  label   = "Environment"
+  options = ["dev", "staging", "prod"]

@@ -1,0 +1,13 @@
+{
+  "name": "platformr",
+  "description": "Developer self-service platform CLI — opens pull requests on behalf of developers",
+  "url": "https://github.com/devops-chris/platformr",
+  "public": false,
+  "default_permissions": {
+    "contents": "write",
+    "pull_requests": "write",
+    "metadata": "read"
+  },
+  "default_events": [],
+  "request_oauth_on_install": false
+}

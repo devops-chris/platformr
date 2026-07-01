@@ -1,0 +1,30 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  disable:
+    - exhaustive
+    - wrapcheck
+
+linters-settings:
+  errcheck:
+    exclude-functions:
+      - (*github.com/charmbracelet/huh.Select[string]).Run
+      - (*github.com/charmbracelet/huh.Input).Run
+      - (*github.com/charmbracelet/huh.Confirm).Run
+      - (*github.com/spf13/pflag.FlagSet).GetString
+      - (*github.com/spf13/pflag.FlagSet).GetBool
+
+issues:
+  exclude-rules:
+    - path: cmd/
+      linters:
+        - errcheck
+      text: "Error return value of .*(huh|spinner|Run|Render|Print)"

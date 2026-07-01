@@ -1,0 +1,19 @@
+# acme-corp/.platformr/config.toml
+#
+# This file lives in a repo named ".platformr" inside your GitHub org.
+# platformr connect acme-corp reads this file to discover IaC repos.
+
+[github]
+default_org = "acme-corp"
+
+[defaults]
+base_branch = "main"
+
+[[repos]]
+url = "platform-claims"        # shorthand — uses default_org → acme-corp/platform-claims
+
+[[repos]]
+url = "terraform-infra"        # acme-corp/terraform-infra
+
+[[repos]]
+url = "other-org/shared-infra" # explicit cross-org repo

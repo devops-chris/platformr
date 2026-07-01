@@ -1,0 +1,58 @@
+# acme-corp/terraform-infra/platformr.toml
+#
+# Terraform resources. Target paths and templates are different from Crossplane
+# but the model is identical — platformr doesn't care which executor runs the IaC.
+
+[defaults]
+target_path   = "environments/{{.resource}}/"
+template_path = "platformr/templates/{{.resource}}.tfvars.tmpl"
+base_branch   = "main"
+
+[[resources]]
+name        = "database"
+description = "Request a new RDS database"
+pr_title    = "feat(db): add {{.name}}"
+
+  [[resources.fields]]
+  name         = "project"
+  type         = "select"
+  label        = "Select project"
+  source       = "resource.project"   # reads from platform-claims/claims/project/
+  allow_create = true
+
+  [[resources.fields]]
+  name        = "name"
+  type        = "input"
+  label       = "Database name"
+  placeholder = "payments-primary"
+  validate    = "unique"
+
+  [[resources.fields]]
+  name    = "engine"
+  type    = "select"
+  label   = "Engine"
+  options = ["postgres", "mysql"]
+
+  [[resources.fields]]
+  name    = "environment"
+  type    = "select"
+  label   = "Environment"
+  options = ["dev", "staging", "prod"]
+
+[[resources]]
+name        = "vpc"
+description = "Request a new VPC"
+pr_title    = "feat(vpc): add {{.name}}"
+
+  [[resources.fields]]
+  name        = "name"
+  type        = "input"
+  label       = "VPC name"
+  placeholder = "prod-us-east-1"
+  validate    = "unique"
+
+  [[resources.fields]]
+  name    = "cidr"
+  type    = "input"
+  label   = "CIDR block"
+  default = "10.0.0.0/16"
