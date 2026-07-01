@@ -351,6 +351,30 @@ source       = "resource.vpc"   # lists files in vpc resource's target_path
 allow_create = true             # adds "[+ create new]" — runs the vpc request flow inline
 ```
 
+### Stripping prefixes from dynamic sources
+
+When directory or file names include a structural prefix that shouldn't be exposed
+to the developer or used in templates, use `strip_prefix` to remove it from the
+displayed options:
+
+```toml
+[[resources.fields]]
+name         = "project"
+type         = "select"
+source       = "dirs:cloud/aws/my-cluster/namespaces"
+strip_prefix = "platform-"   # dirs are "platform-foo", "platform-bar" — shown as "foo", "bar"
+label        = "Project"
+```
+
+The stripped value is what gets stored and used in `{{.project}}` template expressions.
+To reconstruct the original dir name in `target_path_suffix`, prepend the prefix back:
+
+```toml
+target_path_suffix = "platform-{{.project}}/"
+```
+
+`strip_prefix` applies to `dirs:`, `resource.<type>`, `team:`, and `collaborators` sources.
+
 ### Dynamic select — `source = "dirs:<path>"`
 
 Lists subdirectory names at a static path in the IaC repo at request time.

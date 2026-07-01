@@ -105,9 +105,16 @@ func resolveOptions(field config.Field, ctx *FieldContext) ([]string, error) {
 	if ctx == nil || ctx.ListFiles == nil {
 		return nil, fmt.Errorf("no context available to resolve source %q", field.Source)
 	}
-	// Source resolution (repo + path) is handled by the caller via ctx.ListFiles.
-	// This is intentionally a thin wrapper — the caller sets up the closure.
-	return ctx.ListFiles("", "")
+	names, err := ctx.ListFiles("", "")
+	if err != nil {
+		return nil, err
+	}
+	if field.StripPrefix != "" {
+		for i, n := range names {
+			names[i] = strings.TrimPrefix(n, field.StripPrefix)
+		}
+	}
+	return names, nil
 }
 
 // PromptComment prompts for an optional freeform note to append to the PR body.
