@@ -53,9 +53,10 @@ type Resource struct {
 	Description string  `toml:"description"`
 	Template    string  `toml:"template"`     // path within this repo, e.g. "platformr/templates/service.yaml.tmpl"
 	TemplateDir string  `toml:"template_dir"` // directory of .tmpl files — all rendered and committed (takes precedence over template)
-	TargetOrg   string  `toml:"target_org"`   // override org for the PR target repo
-	TargetRepo  string  `toml:"target_repo"`  // override repo for PRs (defaults to the repo this config lives in)
-	TargetPath  string  `toml:"target_path"`  // supports {{.field}} interpolation, e.g. "environments/{{.environment}}/"
+	TargetOrg        string  `toml:"target_org"`         // override org for the PR target repo
+	TargetRepo       string  `toml:"target_repo"`        // override repo for PRs (defaults to the repo this config lives in)
+	TargetPath       string  `toml:"target_path"`        // replaces the default target_path entirely; supports {{.field}} interpolation
+	TargetPathSuffix string  `toml:"target_path_suffix"` // appended to the default target_path instead of replacing it
 	FileName    string  `toml:"file_name"`    // supports {{.field}} interpolation, e.g. "{{.vpc_name}}". defaults to first field value
 	FileExt     string  `toml:"file_ext"`     // e.g. ".tf", ".tfvars", ".yaml". defaults to ".yaml"
 	BaseBranch  string  `toml:"base_branch"`

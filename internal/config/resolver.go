@@ -22,8 +22,16 @@ func Resolve(orgCfg *OrgConfig, repo *RepoConfig) {
 		}
 		r.Resolved.Repo = targetRepo
 
-		// Target path: resource → repo default → org default (with {{.resource}} interpolation)
-		targetPath := coalesce(r.TargetPath, repo.Defaults.TargetPath, orgCfg.Defaults.TargetPath)
+		// Target path: resource override → suffix appended to default → default alone
+		var targetPath string
+		if r.TargetPath != "" {
+			targetPath = r.TargetPath
+		} else if r.TargetPathSuffix != "" {
+			base := coalesce(repo.Defaults.TargetPath, orgCfg.Defaults.TargetPath)
+			targetPath = base + r.TargetPathSuffix
+		} else {
+			targetPath = coalesce(repo.Defaults.TargetPath, orgCfg.Defaults.TargetPath)
+		}
 		r.Resolved.TargetPath = renderPattern(targetPath, r.Name)
 
 		// Template dir (multi-file) takes precedence over single-file template.

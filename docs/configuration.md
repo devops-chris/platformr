@@ -147,6 +147,33 @@ platformr/templates/eks/
 Files without template expressions in the name are unaffected — `terragrunt.hcl.tmpl`
 always outputs `terragrunt.hcl`.
 
+### Extending the default path with a suffix
+
+By default, setting `target_path` on a resource replaces the default entirely.
+Use `target_path_suffix` instead to append to the default `target_path`:
+
+```toml
+[defaults]
+target_path = "cloud/aws/{{.account}}/{{.region}}/"
+
+[[resources]]
+name              = "vpc"
+# no override — uses default as-is
+
+[[resources]]
+name              = "project-file"
+target_path_suffix = "{{.project}}/templates/"
+# resolves to: cloud/aws/{{.account}}/{{.region}}/{{.project}}/templates/
+
+[[resources]]
+name        = "namespace-template"
+target_path = "namespace1/templates/"
+# replaces default entirely — static path
+```
+
+`target_path_suffix` supports the same `{{.field}}` expressions as `target_path`.
+If both are set, `target_path` takes precedence.
+
 ### Template conditionals in paths
 
 `target_path` and `pr_title` support full Go `text/template` syntax, including
