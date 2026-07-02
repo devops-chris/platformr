@@ -152,11 +152,12 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	}
 
 	var confirmed bool
-	if err := huh.NewConfirm().
+	conf := huh.NewConfirm().
 		Title("Open a pull request with this request?").
 		Description(confirmDesc).
-		Value(&confirmed).
-		Run(); err != nil {
+		Value(&confirmed)
+	conf.WithTheme(ui.Theme())
+	if err := conf.Run(); err != nil {
 		return err
 	}
 	if !confirmed {
@@ -205,37 +206,54 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+const categoryHeader = "__header__"
+
 func pickResource(allResources []config.Resource) (config.Resource, error) {
+	// Only show category headers if at least one resource has a category set.
+	hasCategories := false
+	for _, r := range allResources {
+		if r.Category != "" {
+			hasCategories = true
+			break
+		}
+	}
+
 	var opts []huh.Option[string]
 	currentCategory := ""
 	for _, r := range allResources {
-		cat := r.Category
-		if cat == "" {
-			cat = "General"
+		if hasCategories {
+			cat := r.Category
+			if cat == "" {
+				cat = "General"
+			}
+			if cat != currentCategory {
+				currentCategory = cat
+				opts = append(opts, huh.NewOption(ui.PickerCategory(cat), categoryHeader+cat))
+			}
 		}
-		label := fmt.Sprintf("%-16s %s", r.Name, ui.Subtle(r.Description))
-		if cat != currentCategory {
-			currentCategory = cat
-			label = fmt.Sprintf("%-16s %s  [%s]", r.Name, ui.Subtle(r.Description), cat)
-		}
-		opts = append(opts, huh.NewOption(label, r.Name))
+		opts = append(opts, huh.NewOption(ui.PickerItem(r.Name, r.Description), r.Name))
 	}
 
-	var selected string
-	if err := huh.NewSelect[string]().
-		Title("What would you like to request?").
-		Options(opts...).
-		Value(&selected).
-		Run(); err != nil {
-		return config.Resource{}, err
-	}
-
-	for _, r := range allResources {
-		if r.Name == selected {
-			return r, nil
+	for {
+		var selected string
+		sel := huh.NewSelect[string]().
+			Title("What would you like to request?").
+			Options(opts...).
+			Value(&selected)
+		sel.WithTheme(ui.Theme())
+		if err := sel.Run(); err != nil {
+			return config.Resource{}, err
 		}
+		if strings.HasPrefix(selected, categoryHeader) {
+			continue // header accidentally selected — re-show picker
+		}
+		for _, r := range allResources {
+			if r.Name == selected {
+				return r, nil
+			}
+		}
+		return config.Resource{}, fmt.Errorf("resource %q not found", selected)
 	}
-	return config.Resource{}, fmt.Errorf("resource %q not found", selected)
 }
 
 func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, ghWrite *ghclient.Client) (map[string]string, error) {

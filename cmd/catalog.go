@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
+	lgtable "github.com/charmbracelet/lipgloss/table"
 	"github.com/devops-chris/platformr/internal/config"
 	"github.com/devops-chris/platformr/internal/remote"
 	"github.com/devops-chris/platformr/internal/ui"
@@ -41,7 +42,7 @@ func runCatalog(cmd *cobra.Command, args []string) error {
 		os.Exit(1)
 	}
 
-	token := resolveToken()
+	token := resolveReadToken()
 	loader := remote.New(token)
 
 	var repos []*config.RepoConfig
@@ -68,35 +69,44 @@ func runCatalog(cmd *cobra.Command, args []string) error {
 	if catalogJSON {
 		return printAllJSON(allResources)
 	}
-	return printResourceList(allResources, repos)
+	return printResourceList(allResources)
 }
 
 // ── List view ────────────────────────────────────────────────────────────────
 
-func printResourceList(resources []config.Resource, repos []*config.RepoConfig) error {
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"})
-	nameStyle := lipgloss.NewStyle().Bold(true).Width(16)
-	categoryStyle := lipgloss.NewStyle().Bold(true).Faint(true)
+func printResourceList(resources []config.Resource) error {
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"})
 
-	fmt.Printf("\n  %s — %s\n\n",
-		headerStyle.Render("platformr catalog"),
+	fmt.Printf("\n  %s  %s\n\n",
+		titleStyle.Render("platformr catalog"),
 		ui.Subtle(localCfg.ConnectedOrg),
 	)
 
+	// Only show category headers if at least one resource has a category set.
+	hasCategories := false
+	for _, r := range resources {
+		if r.Category != "" {
+			hasCategories = true
+			break
+		}
+	}
+
 	currentCategory := ""
 	for _, r := range resources {
-		cat := r.Category
-		if cat == "" {
-			cat = "General"
+		if hasCategories {
+			cat := r.Category
+			if cat == "" {
+				cat = "General"
+			}
+			if cat != currentCategory {
+				if currentCategory != "" {
+					fmt.Println()
+				}
+				currentCategory = cat
+				fmt.Printf("%s\n", ui.PickerCategory(cat))
+			}
 		}
-		if cat != currentCategory {
-			currentCategory = cat
-			fmt.Printf("  %s\n", categoryStyle.Render(cat))
-		}
-		fmt.Printf("    %s %s\n",
-			nameStyle.Render(r.Name),
-			ui.Subtle(r.Description),
-		)
+		fmt.Printf("%s\n", ui.PickerItem(r.Name, r.Description))
 	}
 
 	fmt.Printf("\n  %s\n\n",
@@ -126,11 +136,12 @@ func showResourceSchema(name string, allResources []config.Resource, repos []*co
 }
 
 func printSchemaHuman(r *config.Resource) error {
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"})
+	purple := lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
+	green := lipgloss.AdaptiveColor{Light: "#43BF6D", Dark: "#73F59F"}
+	muted := lipgloss.AdaptiveColor{Light: "#9B9B9B", Dark: "#5C5C5C"}
+
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(purple)
 	labelStyle := lipgloss.NewStyle().Faint(true).Width(14)
-	fieldNameStyle := lipgloss.NewStyle().Bold(true).Width(16)
-	typeStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#43BF6D", Dark: "#73F59F"}).Width(10)
-	noteStyle := lipgloss.NewStyle().Faint(true)
 
 	fmt.Printf("\n  %s  %s\n\n",
 		titleStyle.Render(r.Name),
@@ -141,56 +152,67 @@ func printSchemaHuman(r *config.Resource) error {
 	fmt.Printf("  %s %s\n", labelStyle.Render("Template:"), r.Resolved.TemplateRepo+"/"+r.Resolved.Template)
 	fmt.Printf("  %s %s\n\n", labelStyle.Render("Base branch:"), r.Resolved.BaseBranch)
 
-	fmt.Printf("  %s\n", lipgloss.NewStyle().Bold(true).Render("Fields"))
-	fmt.Printf("  %s\n\n", strings.Repeat("─", 60))
-
-	for _, f := range r.Fields {
-		label := f.Label
-		if label == "" {
-			label = f.Name
-		}
-		notes := fieldNotes(f)
-		fmt.Printf("  %s %s %s\n",
-			fieldNameStyle.Render(f.Name),
-			typeStyle.Render(f.Type),
-			noteStyle.Render(notes),
-		)
-		if f.Label != "" {
-			fmt.Printf("  %s %s\n", labelStyle.Render(""), ui.Subtle("label: "+label))
-		}
-		if len(f.Options) > 0 {
-			fmt.Printf("  %s %s\n", labelStyle.Render(""), ui.Subtle("options: "+strings.Join(f.Options, ", ")))
-		}
-		if f.Source != "" {
-			fmt.Printf("  %s %s\n", labelStyle.Render(""), ui.Subtle("source: "+f.Source))
-		}
-		if f.Default != "" {
-			fmt.Printf("  %s %s\n", labelStyle.Render(""), ui.Subtle("default: "+f.Default))
-		}
-		fmt.Println()
+	if len(r.Fields) == 0 {
+		fmt.Printf("  %s\n\n", ui.Subtle("No fields defined."))
+		return nil
 	}
 
+	// Build table rows
+	var rows [][]string
+	for _, f := range r.Fields {
+		sourceOrOptions := f.Source
+		if sourceOrOptions == "" && len(f.Options) > 0 {
+			sourceOrOptions = strings.Join(f.Options, ", ")
+			if len(sourceOrOptions) > 40 {
+				sourceOrOptions = sourceOrOptions[:37] + "..."
+			}
+		}
+		rows = append(rows, []string{
+			f.Name,
+			f.Type,
+			sourceOrOptions,
+			fieldFlags(f),
+		})
+	}
+
+	t := lgtable.New().
+		Border(lipgloss.RoundedBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(purple)).
+		Headers("Field", "Type", "Source / Options", "Flags").
+		Rows(rows...).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			switch {
+			case row == lgtable.HeaderRow:
+				return lipgloss.NewStyle().Bold(true).Foreground(purple).Padding(0, 1)
+			case col == 0:
+				return lipgloss.NewStyle().Bold(true).Foreground(green).Padding(0, 1)
+			case col == 3:
+				return lipgloss.NewStyle().Foreground(muted).Padding(0, 1)
+			default:
+				return lipgloss.NewStyle().Padding(0, 1)
+			}
+		})
+
+	fmt.Println(lipgloss.NewStyle().MarginLeft(2).Render(t.Render()))
+	fmt.Println()
 	return nil
 }
 
-func fieldNotes(f config.Field) string {
-	var notes []string
+func fieldFlags(f config.Field) string {
+	var flags []string
 	if f.Validate == "unique" {
-		notes = append(notes, "must be unique")
+		flags = append(flags, "unique")
+	}
+	if f.Optional {
+		flags = append(flags, "optional")
 	}
 	if f.AllowCreate {
-		notes = append(notes, "can create new")
-	}
-	if f.Source != "" {
-		notes = append(notes, "dynamic")
+		flags = append(flags, "allow create")
 	}
 	if f.Default != "" {
-		notes = append(notes, "has default")
+		flags = append(flags, "default: "+f.Default)
 	}
-	if len(notes) == 0 {
-		return ""
-	}
-	return "(" + strings.Join(notes, ", ") + ")"
+	return strings.Join(flags, ", ")
 }
 
 // ── JSON output ───────────────────────────────────────────────────────────────

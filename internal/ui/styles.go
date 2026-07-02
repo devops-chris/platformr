@@ -1,6 +1,10 @@
 package ui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"fmt"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 var (
 	colorPurple = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
@@ -36,8 +40,23 @@ func Banner() string {
 	return bannerStyle.Render(content)
 }
 
+var (
+	pickerCategoryStyle = lipgloss.NewStyle().Bold(true).Foreground(colorPurple)
+	pickerNameStyle     = lipgloss.NewStyle().Bold(true)
+)
+
 func Success(msg string) string   { return successStyle.Render("  " + msg) }
 func Error(msg string) string     { return errorStyle.Render("  " + msg) }
 func Warning(msg string) string   { return warningStyle.Render("  " + msg) }
 func Subtle(msg string) string    { return subtleStyle.Render(msg) }
 func Highlight(msg string) string { return bannerTitleStyle.Render(msg) }
+
+// PickerCategory renders a category header for use as a huh select option label.
+func PickerCategory(cat string) string {
+	return pickerCategoryStyle.Render("  ◆ " + cat)
+}
+
+// PickerItem renders a resource name + description for use as a huh select option label.
+func PickerItem(name, desc string) string {
+	return fmt.Sprintf("    %s  %s", pickerNameStyle.Render(fmt.Sprintf("%-14s", name)), subtleStyle.Render(desc))
+}

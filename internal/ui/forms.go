@@ -26,7 +26,7 @@ func PromptField(field config.Field, values map[string]string, ctx *FieldContext
 	}
 
 	switch field.Type {
-	case "select":
+	case "select", "reviewer", "team_reviewer":
 		return promptSelect(label, field, ctx)
 	default:
 		return promptInput(label, field)
@@ -54,11 +54,12 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 	}
 
 	var val string
-	if err := huh.NewSelect[string]().
+	sel := huh.NewSelect[string]().
 		Title(label).
 		Options(toHuhOptions(options)...).
-		Value(&val).
-		Run(); err != nil {
+		Value(&val)
+	sel.WithTheme(Theme())
+	if err := sel.Run(); err != nil {
 		return "", err
 	}
 	if val == "— skip —" {
@@ -76,15 +77,29 @@ func promptInput(label string, field config.Field) (string, error) {
 	if field.Optional {
 		l = label + " (optional)"
 	}
-	if err := huh.NewInput().
+	inp := huh.NewInput().
 		Title(l).
-		Value(&val).
-		Run(); err != nil {
+		Value(&val)
+	inp.WithTheme(Theme())
+	if err := inp.Run(); err != nil {
 		return "", err
 	}
 	// For optional fields, treat the placeholder value as "not set" if unchanged
 	if field.Optional && val == field.Placeholder {
 		return "", nil
+	}
+	return val, nil
+}
+
+// PromptComment prompts for an optional freeform note to append to the PR body.
+func PromptComment() (string, error) {
+	var val string
+	inp := huh.NewInput().
+		Title("Additional notes for the PR? (optional, Enter to skip)").
+		Value(&val)
+	inp.WithTheme(Theme())
+	if err := inp.Run(); err != nil {
+		return "", err
 	}
 	return val, nil
 }
@@ -115,18 +130,6 @@ func resolveOptions(field config.Field, ctx *FieldContext) ([]string, error) {
 		}
 	}
 	return names, nil
-}
-
-// PromptComment prompts for an optional freeform note to append to the PR body.
-func PromptComment() (string, error) {
-	var val string
-	if err := huh.NewInput().
-		Title("Additional notes for the PR? (optional, Enter to skip)").
-		Value(&val).
-		Run(); err != nil {
-		return "", err
-	}
-	return val, nil
 }
 
 func toHuhOptions(vals []string) []huh.Option[string] {
