@@ -206,54 +206,86 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-const categoryHeader = "__header__"
-
 func pickResource(allResources []config.Resource) (config.Resource, error) {
-	// Only show category headers if at least one resource has a category set.
-	hasCategories := false
+	// Collect unique categories in first-seen order.
+	seen := map[string]bool{}
+	var categories []string
 	for _, r := range allResources {
-		if r.Category != "" {
-			hasCategories = true
-			break
+		cat := r.Category
+		if cat == "" {
+			cat = "General"
+		}
+		if !seen[cat] {
+			seen[cat] = true
+			categories = append(categories, cat)
 		}
 	}
 
-	var opts []huh.Option[string]
-	currentCategory := ""
-	for _, r := range allResources {
-		if hasCategories {
-			cat := r.Category
-			if cat == "" {
-				cat = "General"
-			}
-			if cat != currentCategory {
-				currentCategory = cat
-				opts = append(opts, huh.NewOption(ui.PickerCategory(cat), categoryHeader+cat))
-			}
+	// No categories or only one — skip category step entirely.
+	if len(categories) <= 1 {
+		desc := "Select a resource type"
+		if len(categories) == 1 {
+			desc = categories[0]
 		}
-		opts = append(opts, huh.NewOption(ui.PickerItem(r.Name, r.Description), r.Name))
+		return pickFromList("What would you like to request?", desc, allResources)
 	}
 
-	for {
-		var selected string
-		sel := huh.NewSelect[string]().
-			Title("What would you like to request?").
-			Options(opts...).
-			Value(&selected)
-		sel.WithTheme(ui.Theme())
-		if err := sel.Run(); err != nil {
-			return config.Resource{}, err
-		}
-		if strings.HasPrefix(selected, categoryHeader) {
-			continue // header accidentally selected — re-show picker
-		}
-		for _, r := range allResources {
-			if r.Name == selected {
-				return r, nil
-			}
-		}
-		return config.Resource{}, fmt.Errorf("resource %q not found", selected)
+	// Step 1: pick a category.
+	catOpts := make([]huh.Option[string], len(categories))
+	for i, cat := range categories {
+		count := len(resourcesInCategory(allResources, cat))
+		catOpts[i] = huh.NewOption(ui.CategoryOption(cat, count), cat)
 	}
+	var selectedCat string
+	catSel := huh.NewSelect[string]().
+		Title("What type of resource?").
+		Description("Select a category").
+		Options(catOpts...).
+		Value(&selectedCat)
+	catSel.WithTheme(ui.Theme())
+	if err := catSel.Run(); err != nil {
+		return config.Resource{}, err
+	}
+
+	// Step 2: pick resource within that category.
+	return pickFromList("What would you like to request?", selectedCat, resourcesInCategory(allResources, selectedCat))
+}
+
+func resourcesInCategory(all []config.Resource, cat string) []config.Resource {
+	var result []config.Resource
+	for _, r := range all {
+		rc := r.Category
+		if rc == "" {
+			rc = "General"
+		}
+		if rc == cat {
+			result = append(result, r)
+		}
+	}
+	return result
+}
+
+func pickFromList(title, description string, resources []config.Resource) (config.Resource, error) {
+	opts := make([]huh.Option[string], len(resources))
+	for i, r := range resources {
+		opts[i] = huh.NewOption(ui.PickerItem(r.Name, r.Description), r.Name)
+	}
+	var selected string
+	sel := huh.NewSelect[string]().
+		Title(title).
+		Description(description).
+		Options(opts...).
+		Value(&selected)
+	sel.WithTheme(ui.Theme())
+	if err := sel.Run(); err != nil {
+		return config.Resource{}, err
+	}
+	for _, r := range resources {
+		if r.Name == selected {
+			return r, nil
+		}
+	}
+	return config.Resource{}, fmt.Errorf("resource %q not found", selected)
 }
 
 func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, ghWrite *ghclient.Client) (map[string]string, error) {

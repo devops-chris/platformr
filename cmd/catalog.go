@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/huh/spinner"
@@ -91,8 +92,24 @@ func printResourceList(resources []config.Resource) error {
 		}
 	}
 
+	// Sort by category so same-category resources from multiple repos are adjacent.
+	sorted := make([]config.Resource, len(resources))
+	copy(sorted, resources)
+	if hasCategories {
+		sort.SliceStable(sorted, func(i, j int) bool {
+			ci, cj := sorted[i].Category, sorted[j].Category
+			if ci == "" {
+				ci = "General"
+			}
+			if cj == "" {
+				cj = "General"
+			}
+			return ci < cj
+		})
+	}
+
 	currentCategory := ""
-	for _, r := range resources {
+	for _, r := range sorted {
 		if hasCategories {
 			cat := r.Category
 			if cat == "" {

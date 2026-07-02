@@ -51,12 +51,21 @@ func Warning(msg string) string   { return warningStyle.Render("  " + msg) }
 func Subtle(msg string) string    { return subtleStyle.Render(msg) }
 func Highlight(msg string) string { return bannerTitleStyle.Render(msg) }
 
-// PickerCategory renders a category header for use as a huh select option label.
+// PickerCategory renders a category header for static output (e.g. catalog list).
 func PickerCategory(cat string) string {
 	return pickerCategoryStyle.Render("  ◆ " + cat)
 }
 
+// CategoryOption renders a category name + resource count for use as a selectable huh option.
+func CategoryOption(cat string, count int) string {
+	noun := "resources"
+	if count == 1 {
+		noun = "resource"
+	}
+	return fmt.Sprintf("%s  %s", pickerCategoryStyle.Render(cat), subtleStyle.Render(fmt.Sprintf("%d %s", count, noun)))
+}
+
 // PickerItem renders a resource name + description for use as a huh select option label.
 func PickerItem(name, desc string) string {
-	return fmt.Sprintf("    %s  %s", pickerNameStyle.Render(fmt.Sprintf("%-14s", name)), subtleStyle.Render(desc))
+	return fmt.Sprintf("%s  %s", pickerNameStyle.Render(fmt.Sprintf("%-18s", name)), subtleStyle.Render(desc))
 }
