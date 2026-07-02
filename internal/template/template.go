@@ -3,14 +3,25 @@ package template
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"text/template"
 )
+
+var funcMap = template.FuncMap{
+	"split":       strings.Split,
+	"trimPrefix":  strings.TrimPrefix,
+	"trimSuffix":  strings.TrimSuffix,
+	"toLower":     strings.ToLower,
+	"toUpper":     strings.ToUpper,
+	"contains":    strings.Contains,
+	"replace":     strings.ReplaceAll,
+}
 
 // Render executes a template string with the given values.
 // Templates use standard Go text/template syntax: {{.name}}, {{.environment}}, etc.
 // The template content is fetched remotely by the caller before being passed here.
 func Render(content string, values map[string]string) (string, error) {
-	t, err := template.New("resource").Parse(content)
+	t, err := template.New("resource").Funcs(funcMap).Option("missingkey=zero").Parse(content)
 	if err != nil {
 		return "", fmt.Errorf("parsing template: %w", err)
 	}

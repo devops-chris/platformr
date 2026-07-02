@@ -212,6 +212,9 @@ func fieldFlags(f config.Field) string {
 	if f.Default != "" {
 		flags = append(flags, "default: "+f.Default)
 	}
+	if f.When != "" {
+		flags = append(flags, "conditional")
+	}
 	return strings.Join(flags, ", ")
 }
 
@@ -226,7 +229,10 @@ type catalogFieldJSON struct {
 	Options     []string `json:"options,omitempty"`
 	Default     string   `json:"default,omitempty"`
 	Validate    string   `json:"validate,omitempty"`
-	Placeholder string   `json:"placeholder,omitempty"`
+	Placeholder  string   `json:"placeholder,omitempty"`
+	FilterPrefix string   `json:"filter_prefix,omitempty"`
+	StripPrefix  string   `json:"strip_prefix,omitempty"`
+	When         string   `json:"when,omitempty"`
 }
 
 type catalogResourceJSON struct {

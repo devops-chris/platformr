@@ -420,6 +420,39 @@ strip_prefix = "platform-"
 Fields are resolved in order — a `{{.field}}` expression is only valid if that field
 appears earlier in the list.
 
+### Conditional fields
+
+Use `when` to show a field only when a previous field matches a condition.
+The value is a Go template expression evaluated against already-collected field
+values — if it renders to `"true"` the field is shown; otherwise it is skipped
+and its value is set to `""`.
+
+```toml
+[[resources.fields]]
+name     = "create_repo"
+type     = "select"
+options  = ["true", "false"]
+when     = '{{eq .environment "dev"}}'   # only shown when environment = dev
+
+[[resources.fields]]
+name     = "team_ids"
+type     = "input"
+optional = true
+when     = '{{ne .environment "prod"}}'  # hidden for prod
+```
+
+Fields must appear **after** the fields they reference — `when` can only use
+values already collected earlier in the list.
+
+Skipped fields have an empty value in the template. Use `{{if .field}}` to
+conditionally render blocks that depend on them:
+
+```yaml
+{{if .create_repo}}
+  createRepo: {{.create_repo}}
+{{end}}
+```
+
 ### Field validation
 
 ```toml
@@ -444,6 +477,71 @@ module "vpc_{{.name}}" {
   cidr        = "{{.cidr}}"
   environment = "{{.environment}}"
 }
+```
+
+---
+
+## Template functions
+
+In addition to standard Go `text/template` syntax, platformr provides the
+following helper functions for use in `.tmpl` files:
+
+| Function | Signature | Example |
+|---|---|---|
+| `split` | `split sep str` | split comma-separated team IDs into a YAML list |
+| `trimPrefix` | `trimPrefix prefix str` | strip a known prefix from a value |
+| `trimSuffix` | `trimSuffix suffix str` | strip a known suffix from a value |
+| `toLower` | `toLower str` | normalize user input to lowercase |
+| `toUpper` | `toUpper str` | normalize to uppercase |
+| `contains` | `contains substr str` | conditional block based on value content |
+| `replace` | `replace old new str` | substitute characters (e.g. `-` → `_`) |
+
+### Examples
+
+**Render a comma-separated input as a YAML list** — useful for `teamIds` or any
+multi-value field collected as a single comma-separated string:
+
+```yaml
+# field: team_ids = "DevOps,my-team"
+{{if .team_ids}}
+  teamIds:
+{{- range (split "," .team_ids)}}
+    - {{.}}
+{{- end}}
+{{end}}
+```
+
+**Normalize a service name for use as a Kubernetes label** (labels must be
+lowercase and cannot contain spaces):
+
+```yaml
+  labels:
+    app: {{toLower .service_name}}
+```
+
+**Strip a prefix to get a short identifier**:
+
+```yaml
+# .project = "pt-payments" — strip "pt-" to get "payments"
+  shortName: {{trimPrefix "pt-" .project}}
+```
+
+**Replace hyphens with underscores** for environment variable names:
+
+```yaml
+  env:
+    - name: {{replace "-" "_" (toUpper .service_name)}}_PORT
+      value: "8080"
+```
+
+**Conditional block based on whether a value contains a substring**:
+
+```yaml
+{{if contains "prod" .cluster}}
+  replicaCount: 3
+{{else}}
+  replicaCount: 1
+{{end}}
 ```
 
 ---

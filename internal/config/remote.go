@@ -91,5 +91,7 @@ type Field struct {
 	Validate    string   `toml:"validate"`     // "unique" — checks target repo for conflicts
 	Placeholder string   `toml:"placeholder"`
 	Optional    bool     `toml:"optional"`     // if true, field may be left blank; use {{if .field}} in templates
-	StripPrefix string   `toml:"strip_prefix"` // remove this prefix from dynamically sourced option values
+	StripPrefix  string   `toml:"strip_prefix"`  // remove this prefix from dynamically sourced option values
+	FilterPrefix string   `toml:"filter_prefix"` // only include options that start with this prefix
+	When         string   `toml:"when"`          // Go template expression — field is skipped when result is not "true"
 }

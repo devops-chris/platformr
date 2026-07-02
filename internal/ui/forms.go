@@ -124,6 +124,15 @@ func resolveOptions(field config.Field, ctx *FieldContext) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	if field.FilterPrefix != "" {
+		var filtered []string
+		for _, n := range names {
+			if strings.HasPrefix(n, field.FilterPrefix) {
+				filtered = append(filtered, n)
+			}
+		}
+		names = filtered
+	}
 	if field.StripPrefix != "" {
 		for i, n := range names {
 			names[i] = strings.TrimPrefix(n, field.StripPrefix)

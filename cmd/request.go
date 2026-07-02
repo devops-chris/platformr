@@ -260,6 +260,12 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 	values := make(map[string]string)
 
 	for _, field := range resource.Fields {
+		// Evaluate conditional — skip field and set to "" if condition is not met
+		if field.When != "" && template.RenderString(field.When, values) != "true" {
+			values[field.Name] = ""
+			continue
+		}
+
 		ctx := buildFieldContext(field, resource, repos, gh, values)
 
 		val, err := ui.PromptField(field, values, ctx)
