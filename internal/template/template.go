@@ -8,13 +8,14 @@ import (
 )
 
 var funcMap = template.FuncMap{
-	"split":       strings.Split,
-	"trimPrefix":  strings.TrimPrefix,
-	"trimSuffix":  strings.TrimSuffix,
-	"toLower":     strings.ToLower,
-	"toUpper":     strings.ToUpper,
-	"contains":    strings.Contains,
-	"replace":     strings.ReplaceAll,
+	"split":      strings.Split,
+	"trimPrefix": strings.TrimPrefix,
+	"trimSuffix": strings.TrimSuffix,
+	"trimSpace":  strings.TrimSpace,
+	"toLower":    strings.ToLower,
+	"toUpper":    strings.ToUpper,
+	"contains":   strings.Contains,
+	"replace":    strings.ReplaceAll,
 }
 
 // Render executes a template string with the given values.
