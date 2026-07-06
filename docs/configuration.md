@@ -191,6 +191,26 @@ pr_title    = 'feat(vpc): add {{.name}} in {{.account}}/{{if ne .environment "pr
 
 ---
 
+## Resource display names
+
+By default the picker and catalog show the resource `name` — the same slug used
+for `platformr request <name>`. Set `display_name` for a friendlier label without
+changing the CLI argument:
+
+```toml
+[[resources]]
+name         = "platform-project"
+display_name = "Platform Project"
+description  = "Create a new platform project"
+```
+
+- `platformr request platform-project` still works — `name` is the CLI slug
+- The picker shows **Platform Project** and `platformr catalog` shows
+  **Platform Project** `(platform-project)` so the slug is still discoverable
+- Falls back to `name` when `display_name` is not set
+
+---
+
 ## Resource categories
 
 Resources can be grouped with `category` for a tidier picker and catalog:

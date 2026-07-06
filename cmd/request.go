@@ -268,7 +268,7 @@ func resourcesInCategory(all []config.Resource, cat string) []config.Resource {
 func pickFromList(title, description string, resources []config.Resource) (config.Resource, error) {
 	opts := make([]huh.Option[string], len(resources))
 	for i, r := range resources {
-		opts[i] = huh.NewOption(ui.PickerItem(r.Name, r.Description), r.Name)
+		opts[i] = huh.NewOption(ui.PickerItem(r.Label(), r.Description), r.Name)
 	}
 	var selected string
 	sel := huh.NewSelect[string]().

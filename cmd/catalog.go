@@ -123,7 +123,7 @@ func printResourceList(resources []config.Resource) error {
 				fmt.Printf("%s\n", ui.PickerCategory(cat))
 			}
 		}
-		fmt.Printf("%s\n", ui.PickerItem(r.Name, r.Description))
+		fmt.Printf("%s\n", ui.PickerItem(r.Label(), r.Description))
 	}
 
 	fmt.Printf("\n  %s\n\n",
@@ -160,8 +160,12 @@ func printSchemaHuman(r *config.Resource) error {
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(purple)
 	labelStyle := lipgloss.NewStyle().Faint(true).Width(14)
 
+	title := r.Label()
+	if r.DisplayName != "" {
+		title += "  " + ui.Subtle("("+r.Name+")")
+	}
 	fmt.Printf("\n  %s  %s\n\n",
-		titleStyle.Render(r.Name),
+		titleStyle.Render(title),
 		ui.Subtle(r.Description),
 	)
 

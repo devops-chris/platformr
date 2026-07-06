@@ -49,6 +49,7 @@ type RepoConfig struct {
 
 type Resource struct {
 	Name        string  `toml:"name"`
+	DisplayName string  `toml:"display_name"` // optional friendly name shown in picker and catalog; name is still used for CLI args
 	Category    string  `toml:"category"`     // optional grouping label shown in picker and catalog
 	Description string  `toml:"description"`
 	Template    string  `toml:"template"`     // path within this repo, e.g. "platformr/templates/service.yaml.tmpl"
@@ -66,6 +67,15 @@ type Resource struct {
 	Fields       []Field  `toml:"fields"`
 	// Resolved is populated by the resolver after loading. Do not set in TOML.
 	Resolved ResolvedResource `toml:"-"`
+}
+
+// Label returns the display name for use in pickers and catalog output.
+// Falls back to Name if DisplayName is not set.
+func (r Resource) Label() string {
+	if r.DisplayName != "" {
+		return r.DisplayName
+	}
+	return r.Name
 }
 
 // ResolvedResource holds the fully-resolved coordinates after merging defaults.
