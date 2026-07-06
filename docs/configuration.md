@@ -440,6 +440,36 @@ strip_prefix = "platform-"
 Fields are resolved in order — a `{{.field}}` expression is only valid if that field
 appears earlier in the list.
 
+### Computed fields
+
+Use `type = "computed"` to derive a field value from a template expression without
+prompting the user. The expression is evaluated against already-collected field values
+and stored under the field name for use in `target_path`, `pr_title`, and templates.
+
+```toml
+[[resources.fields]]
+name  = "account"
+type  = "computed"
+value = '{{if eq .environment "prod"}}pt-prod-account{{else}}pt-nonprod-account{{end}}'
+
+[[resources.fields]]
+name  = "cluster"
+type  = "computed"
+value = '{{if eq .environment "dev"}}pt-dev-eks{{else if eq .environment "stg"}}pt-stg-eks{{else}}pt-prod-eks{{end}}'
+```
+
+The computed values are then available as `{{.account}}` and `{{.cluster}}` everywhere:
+
+```toml
+target_path = "cloud/aws/{{.account}}/use1/{{.cluster}}/"
+```
+
+Computed fields must appear **after** the fields they reference — `value` can only
+use fields already collected earlier in the list. They respect `when` too, so you
+can conditionally skip a computed field just like any other.
+
+---
+
 ### Conditional fields
 
 Use `when` to show a field only when a previous field matches a condition.

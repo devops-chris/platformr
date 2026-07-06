@@ -92,7 +92,8 @@ type ResolvedResource struct {
 
 type Field struct {
 	Name        string   `toml:"name"`
-	Type        string   `toml:"type"`         // "input" or "select"
+	Type        string   `toml:"type"`         // "input", "select", or "computed"
+	Value       string   `toml:"value"`        // Go template expression for computed fields
 	Label       string   `toml:"label"`
 	Source      string   `toml:"source"`       // "resource.<type>" or "dirs:<path>" — dynamic options
 	AllowCreate bool     `toml:"allow_create"` // offer "[+ create new]" when sourcing from another resource

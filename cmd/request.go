@@ -298,6 +298,12 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 			continue
 		}
 
+		// Computed fields derive their value from a template expression — no prompt
+		if field.Type == "computed" {
+			values[field.Name] = template.RenderString(field.Value, values)
+			continue
+		}
+
 		ctx := buildFieldContext(field, resource, repos, gh, values)
 
 		val, err := ui.PromptField(field, values, ctx)
