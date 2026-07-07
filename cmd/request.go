@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/devops-chris/platformr/internal/config"
 	ghclient "github.com/devops-chris/platformr/internal/github"
 	"github.com/devops-chris/platformr/internal/remote"
@@ -14,6 +15,8 @@ import (
 	"github.com/devops-chris/platformr/internal/ui"
 	"github.com/spf13/cobra"
 )
+
+var requestDryRun bool
 
 var requestCmd = &cobra.Command{
 	Use:   "request [resource]",
@@ -23,13 +26,18 @@ var requestCmd = &cobra.Command{
 Optionally specify the resource type directly to skip the picker:
 
   platformr request eks
-  platformr request vpc`,
+  platformr request vpc
+
+Use --dry-run to see computed values and the rendered template without opening a PR:
+
+  platformr request platform-project --dry-run`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runRequest,
 }
 
 func init() {
 	rootCmd.AddCommand(requestCmd)
+	requestCmd.Flags().BoolVar(&requestDryRun, "dry-run", false, "Show computed values and rendered output without opening a PR")
 }
 
 func runRequest(cmd *cobra.Command, args []string) error {
@@ -142,6 +150,12 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		Run()
 	if tmplErr != nil {
 		return fmt.Errorf("fetching template: %w", tmplErr)
+	}
+
+	// Dry-run: print values + rendered output and exit without opening a PR
+	if requestDryRun {
+		printDryRun(resource, values, prFiles)
+		return nil
 	}
 
 	// Confirm — show target path (dir for multi-file, full path for single-file)
@@ -507,6 +521,48 @@ func copyMap(m map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+func printDryRun(resource config.Resource, values map[string]string, files []ghclient.PRFile) {
+	purple := lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
+	muted := lipgloss.AdaptiveColor{Light: "#9B9B9B", Dark: "#5C5C5C"}
+
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(purple)
+	mutedStyle := lipgloss.NewStyle().Foreground(muted)
+	computedStyle := lipgloss.NewStyle().Foreground(muted).Italic(true)
+	nameStyle := lipgloss.NewStyle().Width(18)
+	divider := mutedStyle.Render(strings.Repeat("─", 52))
+
+	// Build computed field set
+	computed := map[string]bool{}
+	for _, f := range resource.Fields {
+		if f.Type == "computed" {
+			computed[f.Name] = true
+		}
+	}
+
+	fmt.Printf("\n  %s  %s\n", titleStyle.Render("Dry run"), mutedStyle.Render("no PR will be opened"))
+
+	// Field values — in definition order
+	fmt.Printf("\n  %s\n  %s\n", titleStyle.Render("Field values"), divider)
+	for _, f := range resource.Fields {
+		v := values[f.Name]
+		tag := ""
+		if computed[f.Name] {
+			tag = "  " + computedStyle.Render("(computed)")
+		}
+		fmt.Printf("  %s%s%s\n", nameStyle.Render(f.Name), v, tag)
+	}
+
+	// Files
+	fmt.Printf("\n  %s\n  %s\n", titleStyle.Render("Files"), divider)
+	for _, file := range files {
+		fmt.Printf("\n  %s %s\n\n", mutedStyle.Render("→"), file.Path)
+		for _, line := range strings.Split(strings.TrimRight(file.Content, "\n"), "\n") {
+			fmt.Printf("    %s\n", line)
+		}
+	}
+	fmt.Println()
 }
 
 func buildPRBody(resourceName string, values map[string]string, comment string) string {

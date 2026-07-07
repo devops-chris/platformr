@@ -96,9 +96,14 @@ func (l *Loader) loadRepoConfig(repoURL, ref string) (*config.RepoConfig, error)
 	return &cfg, nil
 }
 
-func resolveRepoURL(url, defaultOrg string) string {
+// ResolveRepoURL expands a shorthand repo name to "org/repo" format.
+func ResolveRepoURL(url, defaultOrg string) string {
 	if strings.Contains(url, "/") {
 		return url
 	}
 	return defaultOrg + "/" + url
+}
+
+func resolveRepoURL(url, defaultOrg string) string {
+	return ResolveRepoURL(url, defaultOrg)
 }
