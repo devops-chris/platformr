@@ -39,6 +39,7 @@ Use --dry-run to see computed values and the rendered template without opening a
 func init() {
 	rootCmd.AddCommand(requestCmd)
 	requestCmd.Flags().BoolVar(&requestDryRun, "dry-run", false, "Show computed values and rendered output without opening a PR")
+	requestCmd.ValidArgsFunction = completeResourceNames
 }
 
 func runRequest(cmd *cobra.Command, args []string) error {

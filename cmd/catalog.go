@@ -36,6 +36,7 @@ Examples:
 func init() {
 	rootCmd.AddCommand(catalogCmd)
 	catalogCmd.Flags().BoolVar(&catalogJSON, "json", false, "Output schema as JSON")
+	catalogCmd.ValidArgsFunction = completeResourceNames
 }
 
 func runCatalog(cmd *cobra.Command, args []string) error {

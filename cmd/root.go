@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/devops-chris/platformr/internal/config"
+	"github.com/devops-chris/platformr/internal/remote"
 	"github.com/devops-chris/platformr/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -51,6 +52,31 @@ Run '` + name + ` connect <org>' to get started.`
 
 func init() {
 	cobra.OnInitialize(initConfig)
+}
+
+// completeResourceNames is the ValidArgsFunction for commands that take a resource
+// name argument. Returns resource names with descriptions for shell completion.
+func completeResourceNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) >= 1 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	if localCfg == nil || localCfg.ConnectedOrg == "" {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	token := resolveReadToken()
+	if token == "" {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	loader := remote.New(token)
+	_, repos, err := loader.LoadAll(localCfg.ConnectedOrg)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	var completions []string
+	for _, r := range remote.AllResources(repos) {
+		completions = append(completions, r.Name+"\t"+r.Description)
+	}
+	return completions, cobra.ShellCompDirectiveNoFileComp
 }
 
 func initConfig() {
