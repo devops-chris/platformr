@@ -149,7 +149,7 @@ func runDoctor(_ *cobra.Command, _ []string) error {
 
 	if orgCfg.GitHub.AppClientID == "" {
 		warn("No app_client_id in org config",
-			"Add app_client_id to [github] in .platformr/config.toml to enable `platformr auth`.")
+			"Add app_client_id to [github] in .platformr/config.toml to enable `"+binaryName+" auth`.")
 	} else {
 		pass(fmt.Sprintf("GitHub App client ID: %s", orgCfg.GitHub.AppClientID))
 	}

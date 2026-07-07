@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/devops-chris/platformr/internal/auth"
@@ -37,8 +38,9 @@ func init() {
 }
 
 func runAuth(cmd *cobra.Command, args []string) error {
+	binaryName := filepath.Base(os.Args[0])
 	if localCfg == nil || localCfg.ConnectedOrg == "" {
-		fmt.Println(ui.Warning("Not connected. Run `platformr connect <org>` first."))
+		fmt.Println(ui.Warning("Not connected. Run `" + binaryName + " connect <org>` first."))
 		os.Exit(1)
 	}
 
@@ -98,7 +100,7 @@ func runAuth(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("saving token: %w", err)
 	}
 
-	fmt.Println(ui.Success("Authorized. platformr can now open pull requests on your behalf."))
+	fmt.Println(ui.Success(binaryName + " can now open pull requests on your behalf."))
 	return nil
 }
 

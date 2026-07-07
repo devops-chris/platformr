@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
@@ -16,7 +18,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the version",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("platformr %s (%s) built %s\n", Version, Commit, BuildDate)
+		fmt.Printf("%s %s (%s) built %s\n", filepath.Base(os.Args[0]), Version, Commit, BuildDate)
 	},
 }
 

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/huh"
@@ -41,8 +42,9 @@ func init() {
 }
 
 func runRequest(cmd *cobra.Command, args []string) error {
+	binaryName := filepath.Base(os.Args[0])
 	if localCfg == nil || localCfg.ConnectedOrg == "" {
-		fmt.Println(ui.Warning("Not connected. Run `platformr connect <org>` first."))
+		fmt.Println(ui.Warning("Not connected. Run `" + binaryName + " connect <org>` first."))
 		os.Exit(1)
 	}
 
@@ -80,7 +82,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	if len(args) == 1 {
 		found, ok := remote.FindResource(args[0], repos)
 		if !ok {
-			return fmt.Errorf("resource %q not found — run `platformr catalog` to see available resources", args[0])
+			return fmt.Errorf("resource %q not found — run `%s catalog` to see available resources", args[0], binaryName)
 		}
 		resource = found
 	} else {
@@ -567,7 +569,7 @@ func printDryRun(resource config.Resource, values map[string]string, files []ghc
 }
 
 func buildPRBody(resourceName string, values map[string]string, comment string) string {
-	body := fmt.Sprintf("## %s request\n\nOpened via `platformr`\n\n### Details\n\n", resourceName)
+	body := fmt.Sprintf("## %s request\n\nOpened via `%s`\n\n### Details\n\n", resourceName, filepath.Base(os.Args[0]))
 	for k, v := range values {
 		body += fmt.Sprintf("- **%s**: %s\n", k, v)
 	}

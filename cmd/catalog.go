@@ -40,7 +40,7 @@ func init() {
 
 func runCatalog(cmd *cobra.Command, args []string) error {
 	if localCfg == nil || localCfg.ConnectedOrg == "" {
-		fmt.Println(ui.Warning("Not connected. Run `platformr connect <org>` first."))
+		fmt.Println(ui.Warning("Not connected. Run `" + filepath.Base(os.Args[0]) + " connect <org>` first."))
 		os.Exit(1)
 	}
 
@@ -77,10 +77,13 @@ func runCatalog(cmd *cobra.Command, args []string) error {
 // ── List view ────────────────────────────────────────────────────────────────
 
 func printResourceList(resources []config.Resource) error {
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"})
+	purple := lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(purple)
+	nameStyle := lipgloss.NewStyle().Bold(true)
+	binaryName := filepath.Base(os.Args[0])
 
 	fmt.Printf("\n  %s  %s\n\n",
-		titleStyle.Render("platformr catalog"),
+		titleStyle.Render(binaryName+" catalog"),
 		ui.Subtle(localCfg.ConnectedOrg),
 	)
 
@@ -109,6 +112,14 @@ func printResourceList(resources []config.Resource) error {
 		})
 	}
 
+	// Compute max label width for consistent description column alignment.
+	maxLabelWidth := 0
+	for _, r := range sorted {
+		if w := len(r.Label()); w > maxLabelWidth {
+			maxLabelWidth = w
+		}
+	}
+
 	currentCategory := ""
 	for _, r := range sorted {
 		if hasCategories {
@@ -121,17 +132,20 @@ func printResourceList(resources []config.Resource) error {
 					fmt.Println()
 				}
 				currentCategory = cat
-				fmt.Printf("%s\n", ui.PickerCategory(cat))
+				fmt.Printf("  %s\n\n", titleStyle.Render(cat))
 			}
 		}
-		label := r.Label()
+		slug := ""
 		if r.DisplayName != "" {
-			label += "  " + ui.Subtle("("+r.Name+")")
+			slug = "  " + ui.Subtle("("+r.Name+")")
 		}
-		fmt.Printf("%s\n", ui.PickerItem(label, r.Description))
+		fmt.Printf("    %s%s  %s\n",
+			nameStyle.Render(fmt.Sprintf("%-*s", maxLabelWidth, r.Label())),
+			slug,
+			ui.Subtle(r.Description),
+		)
 	}
 
-	binaryName := filepath.Base(os.Args[0])
 	fmt.Printf("\n  %s\n\n",
 		ui.Subtle("Run `"+binaryName+" catalog <name>` for field details."),
 	)
