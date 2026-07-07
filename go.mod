@@ -8,7 +8,7 @@ require (
 	github.com/charmbracelet/huh/spinner v0.0.0-20260223110133-9dc45e34a40b
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/log v1.0.0
-	github.com/devops-chris/clihq v0.1.1
+	github.com/devops-chris/clihq v0.1.2
 	github.com/google/go-github/v67 v67.0.0
 	github.com/spf13/cobra v1.10.2
 	github.com/zalando/go-keyring v0.2.8

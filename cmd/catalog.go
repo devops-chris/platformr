@@ -78,13 +78,11 @@ func runCatalog(cmd *cobra.Command, args []string) error {
 // ── List view ────────────────────────────────────────────────────────────────
 
 func printResourceList(resources []config.Resource) error {
-	purple := lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(purple)
 	nameStyle := lipgloss.NewStyle().Bold(true)
 	binaryName := filepath.Base(os.Args[0])
 
 	fmt.Printf("\n  %s  %s\n\n",
-		titleStyle.Render(binaryName+" catalog"),
+		ui.SectionHeader(binaryName+" catalog"),
 		ui.Subtle(localCfg.ConnectedOrg),
 	)
 
@@ -133,7 +131,7 @@ func printResourceList(resources []config.Resource) error {
 					fmt.Println()
 				}
 				currentCategory = cat
-				fmt.Printf("  %s\n\n", titleStyle.Render(cat))
+				fmt.Printf("  %s\n\n", ui.SectionHeader(cat))
 			}
 		}
 		slug := ""
@@ -177,11 +175,6 @@ func showResourceSchema(name string, allResources []config.Resource, repos []*co
 }
 
 func printSchemaHuman(r *config.Resource) error {
-	purple := lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	green := lipgloss.AdaptiveColor{Light: "#43BF6D", Dark: "#73F59F"}
-	muted := lipgloss.AdaptiveColor{Light: "#9B9B9B", Dark: "#5C5C5C"}
-
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(purple)
 	labelStyle := lipgloss.NewStyle().Faint(true).Width(14)
 
 	title := r.Label()
@@ -189,7 +182,7 @@ func printSchemaHuman(r *config.Resource) error {
 		title += "  " + ui.Subtle("("+r.Name+")")
 	}
 	fmt.Printf("\n  %s  %s\n\n",
-		titleStyle.Render(title),
+		ui.SectionHeader(title),
 		ui.Subtle(r.Description),
 	)
 
@@ -222,17 +215,17 @@ func printSchemaHuman(r *config.Resource) error {
 
 	t := lgtable.New().
 		Border(lipgloss.RoundedBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(purple)).
+		BorderStyle(lipgloss.NewStyle().Foreground(ui.ColorPurple)).
 		Headers("Field", "Type", "Source / Options", "Flags").
 		Rows(rows...).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			switch {
 			case row == lgtable.HeaderRow:
-				return lipgloss.NewStyle().Bold(true).Foreground(purple).Padding(0, 1)
+				return lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPurple).Padding(0, 1)
 			case col == 0:
-				return lipgloss.NewStyle().Bold(true).Foreground(green).Padding(0, 1)
+				return lipgloss.NewStyle().Bold(true).Foreground(ui.ColorGreen).Padding(0, 1)
 			case col == 3:
-				return lipgloss.NewStyle().Foreground(muted).Padding(0, 1)
+				return lipgloss.NewStyle().Foreground(ui.ColorMuted).Padding(0, 1)
 			default:
 				return lipgloss.NewStyle().Padding(0, 1)
 			}

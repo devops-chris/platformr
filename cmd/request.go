@@ -529,14 +529,9 @@ func copyMap(m map[string]string) map[string]string {
 }
 
 func printDryRun(resource config.Resource, values map[string]string, files []ghclient.PRFile) {
-	purple := lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	muted := lipgloss.AdaptiveColor{Light: "#9B9B9B", Dark: "#5C5C5C"}
-
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(purple)
-	mutedStyle := lipgloss.NewStyle().Foreground(muted)
-	computedStyle := lipgloss.NewStyle().Foreground(muted).Italic(true)
+	computedStyle := lipgloss.NewStyle().Foreground(ui.ColorMuted).Italic(true)
 	nameStyle := lipgloss.NewStyle().Width(18)
-	divider := mutedStyle.Render(strings.Repeat("─", 52))
+	divider := ui.Subtle(strings.Repeat("─", 52))
 
 	// Build computed field set
 	computed := map[string]bool{}
@@ -546,10 +541,10 @@ func printDryRun(resource config.Resource, values map[string]string, files []ghc
 		}
 	}
 
-	fmt.Printf("\n  %s  %s\n", titleStyle.Render("Dry run"), mutedStyle.Render("no PR will be opened"))
+	fmt.Printf("\n  %s  %s\n", ui.SectionHeader("Dry run"), ui.Subtle("no PR will be opened"))
 
 	// Field values — in definition order
-	fmt.Printf("\n  %s\n  %s\n", titleStyle.Render("Field values"), divider)
+	fmt.Printf("\n  %s\n  %s\n", ui.SectionHeader("Field values"), divider)
 	for _, f := range resource.Fields {
 		v := values[f.Name]
 		tag := ""
@@ -560,9 +555,9 @@ func printDryRun(resource config.Resource, values map[string]string, files []ghc
 	}
 
 	// Files
-	fmt.Printf("\n  %s\n  %s\n", titleStyle.Render("Files"), divider)
+	fmt.Printf("\n  %s\n  %s\n", ui.SectionHeader("Files"), divider)
 	for _, file := range files {
-		fmt.Printf("\n  %s %s\n\n", mutedStyle.Render("→"), file.Path)
+		fmt.Printf("\n  %s %s\n\n", ui.Subtle("→"), file.Path)
 		for _, line := range strings.Split(strings.TrimRight(file.Content, "\n"), "\n") {
 			fmt.Printf("    %s\n", line)
 		}
