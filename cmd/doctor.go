@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/huh/spinner"
@@ -61,18 +62,20 @@ func runDoctor(_ *cobra.Command, _ []string) error {
 		fmt.Printf("\n  %s\n\n", titleStyle.Render(name))
 	}
 
+	binaryName := filepath.Base(os.Args[0])
+
 	org := ""
 	if localCfg != nil {
 		org = localCfg.ConnectedOrg
 	}
-	fmt.Printf("\n  %s  %s\n", titleStyle.Render("platformr doctor"), mutedStyle.Render(org))
+	fmt.Printf("\n  %s  %s\n", titleStyle.Render(binaryName+" doctor"), mutedStyle.Render(org))
 
 	// ── Local config ─────────────────────────────────────────────────────────
 
 	section("Local config")
 
 	if localCfg == nil || localCfg.ConnectedOrg == "" {
-		fail("Not connected to any org", "Run `platformr connect <org>` to get started.")
+		fail("Not connected to any org", "Run `"+binaryName+" connect <org>` to get started.")
 		fmt.Println()
 		return nil
 	}
@@ -97,7 +100,7 @@ func runDoctor(_ *cobra.Command, _ []string) error {
 
 	if appToken := auth.LoadToken(); appToken == "" {
 		warn("No app token stored",
-			"PRs will be opened under your personal token.\n      Run `platformr auth` to authorize the GitHub App instead.")
+			"PRs will be opened under your personal token.\n      Run `"+binaryName+" auth` to authorize the GitHub App instead.")
 	} else {
 		pass("Write token: GitHub App (keychain)")
 	}
@@ -126,9 +129,17 @@ func runDoctor(_ *cobra.Command, _ []string) error {
 		Run()
 
 	if loadErr != nil {
+		hint := fmt.Sprintf("Error: %v", loadErr)
+		if strings.Contains(loadErr.Error(), "404") || strings.Contains(loadErr.Error(), "Not Found") {
+			hint = "GitHub returned 404 — on internal/private repos this usually means the wrong account is active.\n" +
+				"      Check which account `gh auth status` shows as active and switch if needed:\n" +
+				"      gh auth switch --user <username>"
+		} else if strings.Contains(loadErr.Error(), "401") || strings.Contains(loadErr.Error(), "Bad credentials") {
+			hint = "Token rejected (401). Run `gh auth login` or set GITHUB_TOKEN to a valid token."
+		}
 		fail(
 			fmt.Sprintf("Cannot access %s/.platformr/config.toml", localCfg.ConnectedOrg),
-			fmt.Sprintf("Error: %v\nEnsure the .platformr repo exists and your token has read access.", loadErr),
+			hint,
 		)
 		fmt.Println()
 		return nil
