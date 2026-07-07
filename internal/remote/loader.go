@@ -54,6 +54,16 @@ func AllResources(repos []*config.RepoConfig) []config.Resource {
 	return all
 }
 
+// MapsFor returns the named maps defined in the repo that owns the given resource.
+func MapsFor(resource config.Resource, repos []*config.RepoConfig) map[string]map[string]string {
+	for _, repo := range repos {
+		if repo.RepoName == resource.Resolved.TemplateRepo {
+			return repo.Maps
+		}
+	}
+	return nil
+}
+
 // FindResource finds a resource by name across all repos.
 func FindResource(name string, repos []*config.RepoConfig) (config.Resource, bool) {
 	for _, repo := range repos {

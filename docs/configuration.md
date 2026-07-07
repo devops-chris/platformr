@@ -470,6 +470,40 @@ can conditionally skip a computed field just like any other.
 
 ---
 
+### Named maps
+
+For larger value lookups — like mapping account names to AWS account IDs across
+20+ accounts — define a `[maps]` section in `platformr.toml`. Each key under
+`[maps]` is a named table available in templates via Go's built-in `index` function.
+
+```toml
+[maps.aws_account_ids]
+pt-shared-dev-services  = "203918879355"
+pt-shared-stg-services  = "203918879355"
+pt-shared-prod-services = "444455556666"
+pt-chiro-dev-services   = "555566667777"
+pt-rcm-dev-services     = "666677778888"
+# add more without touching resource or field definitions
+```
+
+Reference a map in a computed field using `{{index .maps.<name> <key>}}`:
+
+```toml
+[[resources.fields]]
+name  = "aws_account_id"
+type  = "computed"
+value = '{{index .maps.aws_account_ids .account}}'
+```
+
+The lookup key is any already-collected field value — typically a computed field
+like `account` that was resolved earlier in the list. Maps are also available
+inside `.tmpl` files and anywhere else `{{.field}}` expressions are supported.
+
+If the key is not found the value is empty, same as `missingkey=zero` behaviour
+on other fields.
+
+---
+
 ### Conditional fields
 
 Use `when` to show a field only when a previous field matches a condition.

@@ -116,9 +116,10 @@ func runRequest(cmd *cobra.Command, args []string) error {
 					tmplErr = err
 					return
 				}
-				targetPath := template.RenderString(resource.Resolved.TargetPath, values)
+				resMaps := remote.MapsFor(resource, repos)
+				targetPath := template.RenderString(resource.Resolved.TargetPath, values, resMaps)
 				for _, tf := range tmplFiles {
-					rendered, err := template.Render(tf.Content, values)
+					rendered, err := template.Render(tf.Content, values, resMaps)
 					if err != nil {
 						tmplErr = fmt.Errorf("rendering %s: %w", tf.Name, err)
 						return
@@ -136,7 +137,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 					tmplErr = err
 					return
 				}
-				rendered, err := template.Render(content, values)
+				rendered, err := template.Render(content, values, remote.MapsFor(resource, repos))
 				if err != nil {
 					tmplErr = fmt.Errorf("rendering template: %w", err)
 					return
@@ -161,7 +162,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	// Confirm — show target path (dir for multi-file, full path for single-file)
 	confirmDesc := fmt.Sprintf("→ %s/%s", resource.Resolved.Repo, prFiles[0].Path)
 	if len(prFiles) > 1 {
-		targetPath := template.RenderString(resource.Resolved.TargetPath, values)
+		targetPath := template.RenderString(resource.Resolved.TargetPath, values, remote.MapsFor(resource, repos))
 		confirmDesc = fmt.Sprintf("→ %s/%s (%d files)", resource.Resolved.Repo, targetPath, len(prFiles))
 	}
 
@@ -203,7 +204,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 				Repo:          resource.Resolved.Repo,
 				Branch:        fmt.Sprintf("platformr/%s-%s", resource.Name, resolveSlug(resource, values)),
 				BaseBranch:    resource.Resolved.BaseBranch,
-				Title:         template.RenderString(resource.PRTitle, values),
+				Title:         template.RenderString(resource.PRTitle, values, remote.MapsFor(resource, repos)),
 				Body:          buildPRBody(resource.Name, values, comment),
 				Files:         prFiles,
 				Reviewers:     reviewers,
@@ -307,14 +308,14 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 
 	for _, field := range resource.Fields {
 		// Evaluate conditional — skip field and set to "" if condition is not met
-		if field.When != "" && template.RenderString(field.When, values) != "true" {
+		if field.When != "" && template.RenderString(field.When, values, remote.MapsFor(resource, repos)) != "true" {
 			values[field.Name] = ""
 			continue
 		}
 
 		// Computed fields derive their value from a template expression — no prompt
 		if field.Type == "computed" {
-			values[field.Name] = template.RenderString(field.Value, values)
+			values[field.Name] = template.RenderString(field.Value, values, remote.MapsFor(resource, repos))
 			continue
 		}
 
@@ -434,7 +435,7 @@ func buildFieldContext(field config.Field, resource config.Resource, repos []*co
 	}
 
 	if strings.HasPrefix(field.Source, "dirs:") {
-		dirPath := template.RenderString(strings.TrimPrefix(field.Source, "dirs:"), values)
+		dirPath := template.RenderString(strings.TrimPrefix(field.Source, "dirs:"), values, remote.MapsFor(resource, repos))
 		return &ui.FieldContext{
 			ListFiles: func(_, _ string) ([]string, error) {
 				return gh.ListDirs(resource.Resolved.TemplateRepo, dirPath, resource.Resolved.TemplateRef)

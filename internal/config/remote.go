@@ -39,8 +39,11 @@ type RepoRef struct {
 // RepoConfig is fetched from each IaC repo's platformr.toml.
 // Templates and resource definitions live alongside the IaC they describe.
 type RepoConfig struct {
-	Defaults  ResourceDefaults `toml:"defaults"`
-	Resources []Resource       `toml:"resources"`
+	Defaults  ResourceDefaults            `toml:"defaults"`
+	Resources []Resource                  `toml:"resources"`
+	// Maps defines named lookup tables available in templates via {{index .maps.<name> <key>}}.
+	// Useful for mapping computed values (e.g. account name → AWS account ID) without prompting.
+	Maps      map[string]map[string]string `toml:"maps"`
 	// Set at load time from the repo URL, not from TOML.
 	RepoOwner string `toml:"-"`
 	RepoName  string `toml:"-"` // full "owner/repo"
