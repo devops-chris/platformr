@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -123,11 +124,16 @@ func printResourceList(resources []config.Resource) error {
 				fmt.Printf("%s\n", ui.PickerCategory(cat))
 			}
 		}
-		fmt.Printf("%s\n", ui.PickerItem(r.Label(), r.Description))
+		label := r.Label()
+		if r.DisplayName != "" {
+			label += "  " + ui.Subtle("("+r.Name+")")
+		}
+		fmt.Printf("%s\n", ui.PickerItem(label, r.Description))
 	}
 
+	binaryName := filepath.Base(os.Args[0])
 	fmt.Printf("\n  %s\n\n",
-		ui.Subtle("Run `platformr catalog <name>` for field details."),
+		ui.Subtle("Run `"+binaryName+" catalog <name>` for field details."),
 	)
 	return nil
 }
@@ -135,15 +141,18 @@ func printResourceList(resources []config.Resource) error {
 // ── Schema view ──────────────────────────────────────────────────────────────
 
 func showResourceSchema(name string, allResources []config.Resource, repos []*config.RepoConfig) error {
+	nameLower := strings.ToLower(name)
 	var resource *config.Resource
 	for i := range allResources {
-		if allResources[i].Name == name {
-			resource = &allResources[i]
+		r := &allResources[i]
+		if r.Name == name || strings.ToLower(r.Name) == nameLower || strings.ToLower(r.DisplayName) == nameLower {
+			resource = r
 			break
 		}
 	}
+	binaryName := filepath.Base(os.Args[0])
 	if resource == nil {
-		return fmt.Errorf("resource %q not found — run `platformr catalog` to see available resources", name)
+		return fmt.Errorf("resource %q not found — run `%s catalog` to see available resources", name, binaryName)
 	}
 
 	if catalogJSON {
