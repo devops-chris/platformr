@@ -1,10 +1,11 @@
-package ui
+package prompt
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/huh"
+	"github.com/devops-chris/clihq/ui"
 	"github.com/devops-chris/platformr/internal/config"
 )
 
@@ -58,7 +59,7 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 		Title(label).
 		Options(toHuhOptions(options)...).
 		Value(&val)
-	sel.WithTheme(Theme())
+	sel.WithTheme(ui.Theme())
 	if err := sel.Run(); err != nil {
 		return "", err
 	}
@@ -80,7 +81,7 @@ func promptInput(label string, field config.Field) (string, error) {
 	inp := huh.NewInput().
 		Title(l).
 		Value(&val)
-	inp.WithTheme(Theme())
+	inp.WithTheme(ui.Theme())
 	if err := inp.Run(); err != nil {
 		return "", err
 	}
@@ -97,7 +98,7 @@ func PromptComment() (string, error) {
 	inp := huh.NewInput().
 		Title("Additional notes for the PR? (optional, Enter to skip)").
 		Value(&val)
-	inp.WithTheme(Theme())
+	inp.WithTheme(ui.Theme())
 	if err := inp.Run(); err != nil {
 		return "", err
 	}

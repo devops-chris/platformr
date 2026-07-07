@@ -10,10 +10,10 @@ import (
 
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/log"
+	"github.com/devops-chris/clihq/ui"
 	"github.com/devops-chris/platformr/internal/auth"
 	"github.com/devops-chris/platformr/internal/config"
 	"github.com/devops-chris/platformr/internal/remote"
-	"github.com/devops-chris/platformr/internal/ui"
 	"github.com/spf13/cobra"
 )
 

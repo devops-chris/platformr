@@ -11,9 +11,9 @@ import (
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
 	lgtable "github.com/charmbracelet/lipgloss/table"
+	"github.com/devops-chris/clihq/ui"
 	"github.com/devops-chris/platformr/internal/config"
 	"github.com/devops-chris/platformr/internal/remote"
-	"github.com/devops-chris/platformr/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -266,14 +266,14 @@ func fieldFlags(f config.Field) string {
 // ── JSON output ───────────────────────────────────────────────────────────────
 
 type catalogFieldJSON struct {
-	Name        string   `json:"name"`
-	Type        string   `json:"type"`
-	Label       string   `json:"label,omitempty"`
-	Source      string   `json:"source,omitempty"`
-	AllowCreate bool     `json:"allow_create,omitempty"`
-	Options     []string `json:"options,omitempty"`
-	Default     string   `json:"default,omitempty"`
-	Validate    string   `json:"validate,omitempty"`
+	Name         string   `json:"name"`
+	Type         string   `json:"type"`
+	Label        string   `json:"label,omitempty"`
+	Source       string   `json:"source,omitempty"`
+	AllowCreate  bool     `json:"allow_create,omitempty"`
+	Options      []string `json:"options,omitempty"`
+	Default      string   `json:"default,omitempty"`
+	Validate     string   `json:"validate,omitempty"`
 	Placeholder  string   `json:"placeholder,omitempty"`
 	FilterPrefix string   `json:"filter_prefix,omitempty"`
 	StripPrefix  string   `json:"strip_prefix,omitempty"`

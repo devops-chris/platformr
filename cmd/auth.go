@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 
 	"github.com/charmbracelet/huh/spinner"
+	"github.com/devops-chris/clihq/ui"
 	"github.com/devops-chris/platformr/internal/auth"
 	"github.com/devops-chris/platformr/internal/remote"
-	"github.com/devops-chris/platformr/internal/ui"
 	"github.com/spf13/cobra"
 )
 

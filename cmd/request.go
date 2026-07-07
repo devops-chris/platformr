@@ -9,11 +9,12 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/devops-chris/clihq/ui"
 	"github.com/devops-chris/platformr/internal/config"
 	ghclient "github.com/devops-chris/platformr/internal/github"
+	"github.com/devops-chris/platformr/internal/prompt"
 	"github.com/devops-chris/platformr/internal/remote"
 	"github.com/devops-chris/platformr/internal/template"
-	"github.com/devops-chris/platformr/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -101,7 +102,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for optional PR comment
-	comment, err := ui.PromptComment()
+	comment, err := prompt.PromptComment()
 	if err != nil {
 		return err
 	}
@@ -324,13 +325,13 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 
 		ctx := buildFieldContext(field, resource, repos, gh, values)
 
-		val, err := ui.PromptField(field, values, ctx)
+		val, err := prompt.PromptField(field, values, ctx)
 		if err != nil {
 			return nil, err
 		}
 
 		// Handle inline dependency creation
-		if val == ui.CreateNewOption {
+		if val == prompt.CreateNewOption {
 			resourceType := strings.TrimPrefix(field.Source, "resource.")
 			depResource, found := remote.FindResource(resourceType, repos)
 			if !found {
@@ -430,16 +431,16 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 	return values, nil
 }
 
-func buildFieldContext(field config.Field, resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, values map[string]string) *ui.FieldContext {
+func buildFieldContext(field config.Field, resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, values map[string]string) *prompt.FieldContext {
 	if field.Source == "" {
-		return &ui.FieldContext{
+		return &prompt.FieldContext{
 			ListFiles: func(_, _ string) ([]string, error) { return field.Options, nil },
 		}
 	}
 
 	if strings.HasPrefix(field.Source, "dirs:") {
 		dirPath := template.RenderString(strings.TrimPrefix(field.Source, "dirs:"), values, remote.MapsFor(resource, repos))
-		return &ui.FieldContext{
+		return &prompt.FieldContext{
 			ListFiles: func(_, _ string) ([]string, error) {
 				return gh.ListDirs(resource.Resolved.TemplateRepo, dirPath, resource.Resolved.TemplateRef)
 			},
@@ -448,7 +449,7 @@ func buildFieldContext(field config.Field, resource config.Resource, repos []*co
 
 	if strings.HasPrefix(field.Source, "team:") {
 		teamSlug := strings.TrimPrefix(field.Source, "team:")
-		return &ui.FieldContext{
+		return &prompt.FieldContext{
 			ListFiles: func(_, _ string) ([]string, error) {
 				return gh.ListTeamMembers(resource.Resolved.Org, teamSlug)
 			},
@@ -456,7 +457,7 @@ func buildFieldContext(field config.Field, resource config.Resource, repos []*co
 	}
 
 	if field.Source == "collaborators" {
-		return &ui.FieldContext{
+		return &prompt.FieldContext{
 			ListFiles: func(_, _ string) ([]string, error) {
 				return gh.ListCollaborators(resource.Resolved.Repo)
 			},
@@ -464,7 +465,7 @@ func buildFieldContext(field config.Field, resource config.Resource, repos []*co
 	}
 
 	if !strings.HasPrefix(field.Source, "resource.") {
-		return &ui.FieldContext{
+		return &prompt.FieldContext{
 			ListFiles: func(_, _ string) ([]string, error) { return field.Options, nil },
 		}
 	}
@@ -475,7 +476,7 @@ func buildFieldContext(field config.Field, resource config.Resource, repos []*co
 		return nil
 	}
 
-	return &ui.FieldContext{
+	return &prompt.FieldContext{
 		ListFiles: func(_, _ string) ([]string, error) {
 			return gh.ListFiles(depResource.Resolved.Repo, depResource.Resolved.TargetPath)
 		},

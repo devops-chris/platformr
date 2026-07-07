@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh/spinner"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/devops-chris/clihq/ui"
 	"github.com/devops-chris/platformr/internal/auth"
 	"github.com/devops-chris/platformr/internal/config"
 	ghclient "github.com/devops-chris/platformr/internal/github"
@@ -30,37 +30,10 @@ func init() {
 }
 
 func runDoctor(_ *cobra.Command, _ []string) error {
-	purple := lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	green := lipgloss.AdaptiveColor{Light: "#43BF6D", Dark: "#73F59F"}
-	red := lipgloss.AdaptiveColor{Light: "#D0342C", Dark: "#FF4672"}
-	yellow := lipgloss.AdaptiveColor{Light: "#A07A10", Dark: "#FFCC66"}
-	muted := lipgloss.AdaptiveColor{Light: "#9B9B9B", Dark: "#5C5C5C"}
-
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(purple)
-	passStyle := lipgloss.NewStyle().Bold(true).Foreground(green)
-	failStyle := lipgloss.NewStyle().Bold(true).Foreground(red)
-	warnStyle := lipgloss.NewStyle().Bold(true).Foreground(yellow)
-	mutedStyle := lipgloss.NewStyle().Foreground(muted)
-	hintStyle := lipgloss.NewStyle().Foreground(muted).PaddingLeft(6)
-
-	pass := func(msg string) {
-		fmt.Printf("  %s  %s\n", passStyle.Render("✓"), msg)
-	}
-	fail := func(msg, hint string) {
-		fmt.Printf("  %s  %s\n", failStyle.Render("✗"), msg)
-		if hint != "" {
-			fmt.Printf("%s\n", hintStyle.Render(hint))
-		}
-	}
-	warn := func(msg, hint string) {
-		fmt.Printf("  %s  %s\n", warnStyle.Render("⚠"), msg)
-		if hint != "" {
-			fmt.Printf("%s\n", hintStyle.Render(hint))
-		}
-	}
-	section := func(name string) {
-		fmt.Printf("\n  %s\n\n", titleStyle.Render(name))
-	}
+	pass := func(msg string) { fmt.Println(ui.CheckPass(msg)) }
+	fail := func(msg, hint string) { fmt.Println(ui.CheckFail(msg, hint)) }
+	warn := func(msg, hint string) { fmt.Println(ui.CheckWarn(msg, hint)) }
+	section := func(name string) { fmt.Print(ui.CheckSection(name)) }
 
 	binaryName := filepath.Base(os.Args[0])
 
@@ -68,7 +41,7 @@ func runDoctor(_ *cobra.Command, _ []string) error {
 	if localCfg != nil {
 		org = localCfg.ConnectedOrg
 	}
-	fmt.Printf("\n  %s  %s\n", titleStyle.Render(binaryName+" doctor"), mutedStyle.Render(org))
+	fmt.Printf("\n  %s  %s\n", ui.SectionHeader(binaryName+" doctor"), ui.Subtle(org))
 
 	// ── Local config ─────────────────────────────────────────────────────────
 
