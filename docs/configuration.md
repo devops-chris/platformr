@@ -55,6 +55,23 @@ ref = "cml-platformr"   # fetch platformr.toml and templates from this branch
 
 Useful for testing new templates before merging to main.
 
+### Branding
+
+Orgs can override the banner name and description shown when running `connect`
+and on subsequent command invocations. This is useful when distributing the
+binary under a custom name (e.g. via a private Homebrew tap):
+
+```toml
+[branding]
+name        = "pt-platform"
+description = "PracticeTek developer self-service CLI"
+```
+
+The branding is fetched once during `connect` and cached in
+`~/.config/platformr/config.toml`. The binary name (`os.Args[0]`) is used as a
+fallback when `name` is not set, so re-running `connect` without a `[branding]`
+section always shows the right executable name.
+
 ### Enterprise with multiple orgs
 
 If your company uses GitHub Enterprise Cloud (or Server) with many orgs, `default_org`

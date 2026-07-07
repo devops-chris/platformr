@@ -32,10 +32,10 @@ var (
 				Faint(true)
 )
 
-func Banner() string {
+func Banner(name, description string) string {
 	content := lipgloss.JoinVertical(lipgloss.Left,
-		bannerTitleStyle.Render("platformr"),
-		bannerSubtitleStyle.Render("developer self-service platform CLI"),
+		bannerTitleStyle.Render(name),
+		bannerSubtitleStyle.Render(description),
 	)
 	return bannerStyle.Render(content)
 }

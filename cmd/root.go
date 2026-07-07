@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/devops-chris/platformr/internal/config"
+	"github.com/devops-chris/platformr/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -14,6 +15,22 @@ var localCfg *config.LocalConfig
 
 var rootCmd = &cobra.Command{
 	Short: "Developer self-service platform CLI",
+}
+
+// banner returns the app banner using cached org branding when available,
+// falling back to the binary name and a default description.
+func banner() string {
+	name := filepath.Base(os.Args[0])
+	description := "developer self-service platform CLI"
+	if localCfg != nil {
+		if localCfg.Branding.Name != "" {
+			name = localCfg.Branding.Name
+		}
+		if localCfg.Branding.Description != "" {
+			description = localCfg.Branding.Description
+		}
+	}
+	return ui.Banner(name, description)
 }
 
 func Execute() {

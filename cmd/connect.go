@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -34,7 +36,7 @@ func init() {
 }
 
 func runConnect(cmd *cobra.Command, args []string) error {
-	fmt.Println(ui.Banner())
+	binaryName := filepath.Base(os.Args[0])
 
 	org := args[0]
 	token := resolveToken()
@@ -44,12 +46,13 @@ func runConnect(cmd *cobra.Command, args []string) error {
 
 	loader := remote.New(token)
 
+	var orgCfg *config.OrgConfig
 	var repos []*config.RepoConfig
 	var loadErr error
 	_ = spinner.New().
 		Title(fmt.Sprintf("Connecting to %s...", org)).
 		Action(func() {
-			_, repos, loadErr = loader.LoadAll(org)
+			orgCfg, repos, loadErr = loader.LoadAll(org)
 		}).
 		Run()
 
@@ -57,9 +60,23 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not connect to %s: %w\n\nEnsure %s/.platformr/config.toml exists and your token has access.", org, loadErr, org)
 	}
 
+	// Resolve branding: org config wins; fall back to binary name + default description.
+	branding := orgCfg.Branding
+	if branding.Name == "" {
+		branding.Name = binaryName
+	}
+	if branding.Description == "" {
+		branding.Description = "developer self-service platform CLI"
+	}
+
+	fmt.Println(ui.Banner(branding.Name, branding.Description))
+
 	all := remote.AllResources(repos)
 
-	if err := config.SaveLocal(&config.LocalConfig{ConnectedOrg: org}); err != nil {
+	if err := config.SaveLocal(&config.LocalConfig{
+		ConnectedOrg: org,
+		Branding:     branding,
+	}); err != nil {
 		return fmt.Errorf("saving local config: %w", err)
 	}
 
@@ -71,10 +88,10 @@ func runConnect(cmd *cobra.Command, args []string) error {
 			fmt.Printf("    %-16s %s\n", r.Name, ui.Subtle(r.Description))
 		}
 		fmt.Println()
-		fmt.Printf("  Run %s to get started.\n\n", ui.Subtle("`platformr request`"))
+		fmt.Printf("  Run %s to get started.\n\n", ui.Subtle("`"+binaryName+" request`"))
 	} else {
 		fmt.Printf("\n  No resources found yet — add IaC repos to %s/.platformr/config.toml\n\n", org)
-		fmt.Printf("  Then run %s to authorize PR creation.\n\n", ui.Subtle("`platformr auth`"))
+		fmt.Printf("  Then run %s to authorize PR creation.\n\n", ui.Subtle("`"+binaryName+" auth`"))
 	}
 
 	return nil

@@ -6,6 +6,7 @@ type OrgConfig struct {
 	GitHub   OrgGitHubConfig  `toml:"github"`
 	Defaults ResourceDefaults `toml:"defaults"`
 	Repos    []RepoRef        `toml:"repos"`
+	Branding BrandingConfig   `toml:"branding"`
 }
 
 type OrgGitHubConfig struct {

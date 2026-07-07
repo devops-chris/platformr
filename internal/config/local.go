@@ -7,10 +7,18 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// BrandingConfig holds optional display overrides set by the connected org.
+// Cached in local config so every command reflects the org's branding.
+type BrandingConfig struct {
+	Name        string `toml:"name"`
+	Description string `toml:"description"`
+}
+
 // LocalConfig is the minimal config stored at ~/.config/platformr/config.toml.
 // It is written by `platformr connect` and read on every command.
 type LocalConfig struct {
-	ConnectedOrg string `toml:"connected_org"`
+	ConnectedOrg string         `toml:"connected_org"`
+	Branding     BrandingConfig `toml:"branding"`
 }
 
 func LocalConfigPath() (string, error) {
