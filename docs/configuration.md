@@ -55,6 +55,23 @@ ref = "cml-platformr"   # fetch platformr.toml and templates from this branch
 
 Useful for testing new templates before merging to main.
 
+### Overriding ref at runtime
+
+The `ref` above is set by the platform team in the org config and applies to
+*everyone* who runs platformr. To test in-progress IaC changes on a branch
+yourself — without changing what anyone else sees — override it for just your
+own invocation:
+
+```bash
+platformr --ref my-test-branch request rds
+# or
+PLATFORMR_REF=my-test-branch platformr request rds
+```
+
+This overrides the ref used for every configured repo for that one run. Precedence:
+`--ref` flag > `PLATFORMR_REF` env var > the `ref` configured in the org config.
+Nobody else's runs are affected — the org config itself is untouched.
+
 ### Branding
 
 Orgs can override the banner name and description shown when running `connect`
@@ -147,6 +164,43 @@ base_branch       = "main"
 Every `.tmpl` file in the directory is fetched, rendered, and committed.
 The output filename is the template name with `.tmpl` stripped
 (e.g. `vpc.tf.tmpl` → `vpc.tf`).
+
+### Per-file target paths and conditional skipping
+
+By default every file in a `template_dir` is committed to the same `target_path`
+directory. Use `[[resources.template_files]]` to override this per file — useful
+when a single request needs to write to multiple locations (e.g. the main resource
+plus shared account-level infrastructure):
+
+```toml
+[[resources]]
+name         = "ecr"
+template_dir = "platformr/templates/ecr"
+
+  # ecr.tf lands at the default target_path (per-repo subdirectory)
+
+  # oidc.tf is account-level — route it to global/oidc/ and skip if already there
+  [[resources.template_files]]
+  name           = "oidc.tf"
+  target_path    = "cloud/aws/{{.account}}/global/oidc/"
+  skip_if_exists = "cloud/aws/{{.account}}/global/oidc/oidc.tf"
+
+  # iam-ecr-push.tf routes to global/iam/ and is skipped if already present
+  [[resources.template_files]]
+  name           = "iam-ecr-push.tf"
+  target_path    = "cloud/aws/{{.account}}/global/iam/"
+  skip_if_exists = "cloud/aws/{{.account}}/global/iam/iam-ecr-push.tf"
+```
+
+**`target_path`** overrides the resource-level `target_path` for that specific file.
+Files without an entry use the default. Both fields support `{{.field}}` expressions.
+
+**`skip_if_exists`** checks whether a path already exists in the target repo before
+committing that file. If it does, the file is omitted from the PR silently (a note
+is printed). The other files still render and commit normally.
+
+If every file in the directory is skipped, platformr exits with a message rather
+than opening an empty PR.
 
 ### Templated output filenames
 

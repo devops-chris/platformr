@@ -43,6 +43,9 @@ platformr request
 platformr catalog
 platformr catalog service        # field-level schema
 platformr catalog service --json # machine-readable
+
+# Check the status of PRs you've opened
+platformr status
 ```
 
 ---
@@ -79,6 +82,9 @@ url = "other-org/shared-infra"  # cross-org repos work too
 # url = "terraform-infra"
 # ref = "my-test-branch"
 ```
+
+Developers can also override the ref for their own runs only, without touching
+this shared config — see [Overriding ref at runtime](docs/configuration.md#overriding-ref-at-runtime).
 
 > **Visibility:** Use **Internal** on GitHub Enterprise so all org members can
 > read it automatically. Private requires explicit access grants.
@@ -204,6 +210,9 @@ attributed to the app rather than your personal account.
 For **GitHub Enterprise Server**, set `GH_HOST=github.mycompany.com` before
 connecting. platformr mirrors the `gh` CLI convention.
 
+GitHub App tokens expire (there's no refresh flow yet) — if `connect` fails
+with a `401 Bad credentials` error, run `platformr auth` again to reauthorize.
+
 ---
 
 ## Commands
@@ -217,7 +226,9 @@ connecting. platformr mirrors the `gh` CLI convention.
 | `platformr catalog` | List available resource types |
 | `platformr catalog <name>` | Show field schema for a resource |
 | `platformr catalog --json` | Machine-readable schema output |
+| `platformr status` | Check the status of PRs you've opened (open/merged/closed) |
 | `platformr version` | Print version info |
+| `--ref <branch>` (any command) | Override the IaC repo ref for this run only (or `PLATFORMR_REF`) |
 
 ---
 
