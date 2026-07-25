@@ -2,9 +2,12 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	gh "github.com/google/go-github/v67/github"
 	"golang.org/x/oauth2"
@@ -12,6 +15,17 @@ import (
 
 type Client struct {
 	client *gh.Client
+}
+
+// IsUnauthorized reports whether err is a GitHub API 401 response — the signature
+// of a revoked or expired token (GitHub App user-to-server tokens expire and this
+// app doesn't yet refresh them, see auth.LoadToken).
+func IsUnauthorized(err error) bool {
+	var ghErr *gh.ErrorResponse
+	if errors.As(err, &ghErr) {
+		return ghErr.Response != nil && ghErr.Response.StatusCode == http.StatusUnauthorized
+	}
+	return false
 }
 
 func New(token string) *Client {
@@ -220,6 +234,81 @@ func (c *Client) FileExists(repo, path string) (bool, error) {
 	return true, nil
 }
 
+// RequestLabel is applied to every pull request platformr opens, so that requests
+// can be found later via GitHub search regardless of branch name or title — see
+// MyRequestPRs.
+const RequestLabel = "platformr"
+
+// CurrentUser returns the login of the authenticated GitHub user.
+func (c *Client) CurrentUser() (string, error) {
+	user, _, err := c.client.Users.Get(context.Background(), "")
+	if err != nil {
+		return "", fmt.Errorf("fetching authenticated user: %w", err)
+	}
+	return user.GetLogin(), nil
+}
+
+// PRStatus summarizes a pull request opened by platformr, for the `status` command.
+type PRStatus struct {
+	Repo      string
+	Number    int
+	Title     string
+	State     string // "open", "merged", or "closed"
+	URL       string
+	CreatedAt time.Time
+}
+
+// MyRequestPRs returns pull requests in repo labeled RequestLabel and authored by
+// user, newest first. The label and author filters are applied server-side by
+// GitHub search, so only matching PRs are ever fetched — not the whole repo's PR list.
+func (c *Client) MyRequestPRs(repo, user string) ([]PRStatus, error) {
+	ctx := context.Background()
+	query := fmt.Sprintf("repo:%s is:pr label:%s author:%s", repo, RequestLabel, user)
+	result, _, err := c.client.Search.Issues(ctx, query, &gh.SearchOptions{
+		Sort:        "created",
+		Order:       "desc",
+		ListOptions: gh.ListOptions{PerPage: 100},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("searching pull requests for %s: %w", repo, err)
+	}
+
+	out := make([]PRStatus, 0, len(result.Issues))
+	for _, issue := range result.Issues {
+		state := "closed"
+		switch issue.GetState() {
+		case "open":
+			state = "open"
+		default:
+			if issue.PullRequestLinks != nil && issue.PullRequestLinks.MergedAt != nil {
+				state = "merged"
+			}
+		}
+		out = append(out, PRStatus{
+			Repo:      repo,
+			Number:    issue.GetNumber(),
+			Title:     issue.GetTitle(),
+			State:     state,
+			URL:       issue.GetHTMLURL(),
+			CreatedAt: issue.GetCreatedAt().Time,
+		})
+	}
+	return out, nil
+}
+
+// ensureRequestLabel creates the RequestLabel label in repo if it doesn't already exist.
+func (c *Client) ensureRequestLabel(ctx context.Context, owner, repo string) error {
+	_, resp, err := c.client.Issues.CreateLabel(ctx, owner, repo, &gh.Label{
+		Name:        gh.String(RequestLabel),
+		Color:       gh.String("6f42c1"),
+		Description: gh.String("Opened via platformr"),
+	})
+	if err == nil || (resp != nil && resp.StatusCode == 422) {
+		return nil // created, or already exists
+	}
+	return err
+}
+
 // CreatePR creates a branch, commits one or more files, and opens a pull request.
 // If req.Files is non-empty the Git tree API is used for an atomic multi-file commit.
 // Otherwise req.FilePath + req.Content are committed as a single file.
@@ -330,6 +419,13 @@ func (c *Client) openPR(ctx context.Context, owner, repo, baseBranch string, req
 	})
 	if err != nil {
 		return "", fmt.Errorf("creating pull request: %w", err)
+	}
+
+	if err := c.ensureRequestLabel(ctx, owner, repo); err != nil {
+		return pr.GetHTMLURL(), fmt.Errorf("PR created but labeling failed: %w", err)
+	}
+	if _, _, err := c.client.Issues.AddLabelsToIssue(ctx, owner, repo, pr.GetNumber(), []string{RequestLabel}); err != nil {
+		return pr.GetHTMLURL(), fmt.Errorf("PR created but labeling failed: %w", err)
 	}
 
 	if len(req.Reviewers) > 0 || len(req.TeamReviewers) > 0 {
