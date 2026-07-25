@@ -2,12 +2,31 @@ package remote
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/devops-chris/platformr/internal/config"
 	"github.com/devops-chris/platformr/internal/github"
 )
+
+// RefOverride, when set, overrides the configured ref/branch for every IaC repo,
+// for this invocation only — the org config (shared by everyone) is untouched.
+// Set via the `--ref` flag (cmd/root.go binds to this directly) or the
+// PLATFORMR_REF env var if the flag isn't given.
+var RefOverride string
+
+// refFor resolves the ref to use for a repo: RefOverride wins, then PLATFORMR_REF,
+// then the ref configured for that repo in the org config.
+func refFor(configuredRef string) string {
+	if RefOverride != "" {
+		return RefOverride
+	}
+	if envRef := os.Getenv("PLATFORMR_REF"); envRef != "" {
+		return envRef
+	}
+	return configuredRef
+}
 
 // Loader fetches and parses platformr configs from GitHub at runtime.
 // No local config files are needed beyond the connected org name.
@@ -32,7 +51,7 @@ func (l *Loader) LoadAll(orgName string) (*config.OrgConfig, []*config.RepoConfi
 	for _, repoRef := range orgCfg.Repos {
 		repoURL := resolveRepoURL(repoRef.URL, orgCfg.GitHub.DefaultOrg)
 
-		repoCfg, err := l.loadRepoConfig(repoURL, repoRef.Ref)
+		repoCfg, err := l.loadRepoConfig(repoURL, refFor(repoRef.Ref))
 		if err != nil {
 			// Non-fatal: repo may not have a platformr.toml yet
 			continue

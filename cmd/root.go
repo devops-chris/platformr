@@ -35,6 +35,8 @@ Run '` + name + ` connect <org>' to get started.`
 
 func init() {
 	cobra.OnInitialize(initConfig)
+	rootCmd.PersistentFlags().StringVar(&remote.RefOverride, "ref", "",
+		"Override the git ref/branch used for all IaC repos this run (or set PLATFORMR_REF)")
 }
 
 // completeResourceNames is the ValidArgsFunction for commands that take a resource
