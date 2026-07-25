@@ -22,6 +22,31 @@ pr_title    = "feat(project): add {{.name}}"
   validate    = "unique"
 
 [[resources]]
+name         = "ecr"
+description  = "Add a new ECR repository with IAM push access"
+template_dir = "platformr/templates/ecr"
+pr_title     = "feat(ecr): add {{.name}} repository"
+
+  # oidc.tf is account-level — only one OIDC provider is needed per account.
+  # Skip it if the account already has one rather than duplicating.
+  [[resources.template_files]]
+  name           = "oidc.tf"
+  skip_if_exists = "cloud/aws/{{.account}}/global/oidc/oidc.tf"
+
+  [[resources.fields]]
+  name        = "account"
+  type        = "select"
+  label       = "AWS account"
+  source      = "dirs:cloud/aws"
+
+  [[resources.fields]]
+  name        = "name"
+  type        = "input"
+  label       = "Repository name"
+  placeholder = "my-service"
+  validate    = "unique"
+
+[[resources]]
 name        = "service"
 description = "Create a new microservice"
 pr_title    = "feat(service): add {{.name}}"

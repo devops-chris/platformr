@@ -40,11 +40,11 @@ type RepoRef struct {
 // RepoConfig is fetched from each IaC repo's platformr.toml.
 // Templates and resource definitions live alongside the IaC they describe.
 type RepoConfig struct {
-	Defaults  ResourceDefaults            `toml:"defaults"`
-	Resources []Resource                  `toml:"resources"`
+	Defaults  ResourceDefaults `toml:"defaults"`
+	Resources []Resource       `toml:"resources"`
 	// Maps defines named lookup tables available in templates via {{index .maps.<name> <key>}}.
 	// Useful for mapping computed values (e.g. account name → AWS account ID) without prompting.
-	Maps      map[string]map[string]string `toml:"maps"`
+	Maps map[string]map[string]string `toml:"maps"`
 	// Set at load time from the repo URL, not from TOML.
 	RepoOwner string `toml:"-"`
 	RepoName  string `toml:"-"` // full "owner/repo"
@@ -52,23 +52,24 @@ type RepoConfig struct {
 }
 
 type Resource struct {
-	Name        string  `toml:"name"`
-	DisplayName string  `toml:"display_name"` // optional friendly name shown in picker and catalog; name is still used for CLI args
-	Category    string  `toml:"category"`     // optional grouping label shown in picker and catalog
-	Description string  `toml:"description"`
-	Template    string  `toml:"template"`     // path within this repo, e.g. "platformr/templates/service.yaml.tmpl"
-	TemplateDir string  `toml:"template_dir"` // directory of .tmpl files — all rendered and committed (takes precedence over template)
-	TargetOrg        string  `toml:"target_org"`         // override org for the PR target repo
-	TargetRepo       string  `toml:"target_repo"`        // override repo for PRs (defaults to the repo this config lives in)
-	TargetPath       string  `toml:"target_path"`        // replaces the default target_path entirely; supports {{.field}} interpolation
-	TargetPathSuffix string  `toml:"target_path_suffix"` // appended to the default target_path instead of replacing it
-	FileName    string  `toml:"file_name"`    // supports {{.field}} interpolation, e.g. "{{.vpc_name}}". defaults to first field value
-	FileExt     string  `toml:"file_ext"`     // e.g. ".tf", ".tfvars", ".yaml". defaults to ".yaml"
-	BaseBranch  string  `toml:"base_branch"`
-	PRTitle      string   `toml:"pr_title"`
-	Reviewers    []string `toml:"reviewers"`      // GitHub usernames auto-requested on every PR for this resource
-	TeamReviewers []string `toml:"team_reviewers"` // GitHub team slugs auto-requested on every PR for this resource
-	Fields       []Field  `toml:"fields"`
+	Name             string               `toml:"name"`
+	DisplayName      string               `toml:"display_name"` // optional friendly name shown in picker and catalog; name is still used for CLI args
+	Category         string               `toml:"category"`     // optional grouping label shown in picker and catalog
+	Description      string               `toml:"description"`
+	Template         string               `toml:"template"`           // path within this repo, e.g. "platformr/templates/service.yaml.tmpl"
+	TemplateDir      string               `toml:"template_dir"`       // directory of .tmpl files — all rendered and committed (takes precedence over template)
+	TargetOrg        string               `toml:"target_org"`         // override org for the PR target repo
+	TargetRepo       string               `toml:"target_repo"`        // override repo for PRs (defaults to the repo this config lives in)
+	TargetPath       string               `toml:"target_path"`        // replaces the default target_path entirely; supports {{.field}} interpolation
+	TargetPathSuffix string               `toml:"target_path_suffix"` // appended to the default target_path instead of replacing it
+	FileName         string               `toml:"file_name"`          // supports {{.field}} interpolation, e.g. "{{.vpc_name}}". defaults to first field value
+	FileExt          string               `toml:"file_ext"`           // e.g. ".tf", ".tfvars", ".yaml". defaults to ".yaml"
+	BaseBranch       string               `toml:"base_branch"`
+	PRTitle          string               `toml:"pr_title"`
+	Reviewers        []string             `toml:"reviewers"`      // GitHub usernames auto-requested on every PR for this resource
+	TeamReviewers    []string             `toml:"team_reviewers"` // GitHub team slugs auto-requested on every PR for this resource
+	Fields           []Field              `toml:"fields"`
+	TemplateFiles    []TemplateFileConfig `toml:"template_files"` // per-file metadata for multi-file mode
 	// Resolved is populated by the resolver after loading. Do not set in TOML.
 	Resolved ResolvedResource `toml:"-"`
 }
@@ -94,18 +95,26 @@ type ResolvedResource struct {
 	BaseBranch   string
 }
 
+// TemplateFileConfig holds per-file settings for multi-file template mode.
+// Each entry matches a rendered output filename (the template name minus the .tmpl suffix).
+type TemplateFileConfig struct {
+	Name         string `toml:"name"`           // output filename, e.g. "oidc.tf"
+	TargetPath   string `toml:"target_path"`    // directory in target repo; overrides the resource-level target_path for this file
+	SkipIfExists string `toml:"skip_if_exists"` // path in target repo; skip this file if it already exists
+}
+
 type Field struct {
-	Name        string   `toml:"name"`
-	Type        string   `toml:"type"`         // "input", "select", or "computed"
-	Value       string   `toml:"value"`        // Go template expression for computed fields
-	Label       string   `toml:"label"`
-	Source      string   `toml:"source"`       // "resource.<type>" or "dirs:<path>" — dynamic options
-	AllowCreate bool     `toml:"allow_create"` // offer "[+ create new]" when sourcing from another resource
-	Options     []string `toml:"options"`      // static options for select
-	Default     string   `toml:"default"`
-	Validate    string   `toml:"validate"`     // "unique" — checks target repo for conflicts
-	Placeholder string   `toml:"placeholder"`
-	Optional    bool     `toml:"optional"`     // if true, field may be left blank; use {{if .field}} in templates
+	Name         string   `toml:"name"`
+	Type         string   `toml:"type"`  // "input", "select", or "computed"
+	Value        string   `toml:"value"` // Go template expression for computed fields
+	Label        string   `toml:"label"`
+	Source       string   `toml:"source"`       // "resource.<type>" or "dirs:<path>" — dynamic options
+	AllowCreate  bool     `toml:"allow_create"` // offer "[+ create new]" when sourcing from another resource
+	Options      []string `toml:"options"`      // static options for select
+	Default      string   `toml:"default"`
+	Validate     string   `toml:"validate"` // "unique" — checks target repo for conflicts
+	Placeholder  string   `toml:"placeholder"`
+	Optional     bool     `toml:"optional"`      // if true, field may be left blank; use {{if .field}} in templates
 	StripPrefix  string   `toml:"strip_prefix"`  // remove this prefix from dynamically sourced option values
 	FilterPrefix string   `toml:"filter_prefix"` // only include options that start with this prefix
 	When         string   `toml:"when"`          // Go template expression — field is skipped when result is not "true"

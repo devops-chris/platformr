@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/devops-chris/clihq/ui"
+	"github.com/devops-chris/platformr/internal/auth"
 	"github.com/devops-chris/platformr/internal/config"
 	ghclient "github.com/devops-chris/platformr/internal/github"
 	"github.com/devops-chris/platformr/internal/prompt"
@@ -109,6 +110,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 
 	// Fetch template(s) from the IaC repo and render
 	var prFiles []ghclient.PRFile
+	var skippedFiles []string
 	var tmplErr error
 	_ = spinner.New().
 		Title("Fetching template...").
@@ -129,8 +131,20 @@ func runRequest(cmd *cobra.Command, args []string) error {
 						return
 					}
 					outName := template.RenderString(strings.TrimSuffix(tf.Name, ".tmpl"), values)
+					if skipPath := resolveSkipIfExists(resource, outName, values, resMaps); skipPath != "" {
+						var exists bool
+						exists, _ = gh.FileExists(resource.Resolved.Repo, skipPath)
+						if exists {
+							skippedFiles = append(skippedFiles, outName)
+							continue
+						}
+					}
+					filePath := targetPath + outName
+					if override := resolveFileTargetPath(resource, outName, values, resMaps); override != "" {
+						filePath = override + outName
+					}
 					prFiles = append(prFiles, ghclient.PRFile{
-						Path:    targetPath + outName,
+						Path:    filePath,
 						Content: rendered,
 					})
 				}
@@ -155,6 +169,15 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		Run()
 	if tmplErr != nil {
 		return fmt.Errorf("fetching template: %w", tmplErr)
+	}
+
+	for _, name := range skippedFiles {
+		fmt.Println(ui.Subtle(fmt.Sprintf("Skipped %s (already exists in target repo)", name)))
+	}
+
+	if len(prFiles) == 0 {
+		fmt.Println(ui.Warning("All template files already exist in the target repo — nothing to commit."))
+		return nil
 	}
 
 	// Dry-run: print values + rendered output and exit without opening a PR
@@ -218,11 +241,20 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		Run()
 
 	if prErr != nil {
-		return fmt.Errorf("creating PR: %w", prErr)
+		return fmt.Errorf("creating PR: %w", withAuthHint(prErr, binaryName))
 	}
 
 	fmt.Println(ui.Success("PR opened: " + prURL))
 	return nil
+}
+
+// withAuthHint appends a re-auth hint to err when it's a GitHub 401 caused by an
+// expired stored App token (see ghclient.IsUnauthorized and auth.LoadToken).
+func withAuthHint(err error, binaryName string) error {
+	if ghclient.IsUnauthorized(err) && auth.LoadToken() != "" {
+		return fmt.Errorf("%w\n\nYour stored platformr token has likely expired — run `%s auth` to reauthorize.", err, binaryName)
+	}
+	return err
 }
 
 func pickResource(allResources []config.Resource) (config.Resource, error) {
@@ -364,8 +396,20 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 								depErr = fmt.Errorf("rendering %s: %w", tf.Name, err)
 								return
 							}
+							outName := strings.TrimSuffix(tf.Name, ".tmpl")
+							if skipPath := resolveSkipIfExists(depResource, outName, depValues, nil); skipPath != "" {
+								var exists bool
+								exists, _ = gh.FileExists(depResource.Resolved.Repo, skipPath)
+								if exists {
+									continue
+								}
+							}
+							depFilePath := targetPath + outName
+							if override := resolveFileTargetPath(depResource, outName, depValues, nil); override != "" {
+								depFilePath = override + outName
+							}
 							depFiles = append(depFiles, ghclient.PRFile{
-								Path:    targetPath + strings.TrimSuffix(tf.Name, ".tmpl"),
+								Path:    depFilePath,
 								Content: rendered,
 							})
 						}
@@ -397,7 +441,7 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 				Run()
 
 			if depErr != nil {
-				return nil, fmt.Errorf("creating dependency PR: %w", depErr)
+				return nil, fmt.Errorf("creating dependency PR: %w", withAuthHint(depErr, filepath.Base(os.Args[0])))
 			}
 
 			fmt.Println(ui.Success(fmt.Sprintf("%s PR opened: %s", resourceType, depPRURL)))
@@ -518,6 +562,28 @@ func firstFieldName(resource config.Resource) string {
 		return resource.Fields[0].Name
 	}
 	return "name"
+}
+
+// resolveSkipIfExists returns the rendered skip_if_exists path for the given output filename,
+// or "" if no matching entry is configured.
+func resolveSkipIfExists(resource config.Resource, outName string, values map[string]string, maps map[string]map[string]string) string {
+	for _, tf := range resource.TemplateFiles {
+		if tf.Name == outName && tf.SkipIfExists != "" {
+			return template.RenderString(tf.SkipIfExists, values, maps)
+		}
+	}
+	return ""
+}
+
+// resolveFileTargetPath returns the rendered per-file target_path directory for the given output
+// filename, or "" if no override is configured (caller uses the resource-level targetPath).
+func resolveFileTargetPath(resource config.Resource, outName string, values map[string]string, maps map[string]map[string]string) string {
+	for _, tf := range resource.TemplateFiles {
+		if tf.Name == outName && tf.TargetPath != "" {
+			return template.RenderString(tf.TargetPath, values, maps)
+		}
+	}
+	return ""
 }
 
 func copyMap(m map[string]string) map[string]string {
