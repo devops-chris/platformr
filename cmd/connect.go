@@ -13,6 +13,7 @@ import (
 	"github.com/devops-chris/clihq/ui"
 	"github.com/devops-chris/platformr/internal/auth"
 	"github.com/devops-chris/platformr/internal/config"
+	ghclient "github.com/devops-chris/platformr/internal/github"
 	"github.com/devops-chris/platformr/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -39,6 +40,7 @@ func runConnect(cmd *cobra.Command, args []string) error {
 	binaryName := filepath.Base(os.Args[0])
 
 	org := args[0]
+	appToken := auth.LoadToken()
 	token := resolveToken()
 	if token == "" {
 		log.Fatal("No GitHub token found. Set GITHUB_TOKEN, GH_TOKEN, or run `gh auth login`.")
@@ -57,6 +59,9 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		Run()
 
 	if loadErr != nil {
+		if ghclient.IsUnauthorized(loadErr) && appToken != "" {
+			return fmt.Errorf("could not connect to %s: %w\n\nYour stored platformr token has likely expired — run `%s auth` to reauthorize.", org, loadErr, binaryName)
+		}
 		return fmt.Errorf("could not connect to %s: %w\n\nEnsure %s/.platformr/config.toml exists and your token has access.", org, loadErr, org)
 	}
 
