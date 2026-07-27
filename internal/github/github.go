@@ -253,6 +253,7 @@ type PRStatus struct {
 	Repo      string
 	Number    int
 	Title     string
+	Body      string
 	State     string // "open", "merged", or "closed"
 	URL       string
 	CreatedAt time.Time
@@ -261,37 +262,54 @@ type PRStatus struct {
 // MyRequestPRs returns pull requests in repo labeled RequestLabel and authored by
 // user, newest first. The label and author filters are applied server-side by
 // GitHub search, so only matching PRs are ever fetched — not the whole repo's PR list.
-func (c *Client) MyRequestPRs(repo, user string) ([]PRStatus, error) {
+//
+// maxResults bounds how many are fetched, stopping as soon as that many are
+// collected (results arrive newest-first, so this is a correct "N most recent",
+// not an arbitrary truncation) — pass 0 to paginate through every result with no
+// limit at all. Without a bound, a caller wanting only the most recent handful
+// would otherwise still pay for full pagination across however much history exists.
+func (c *Client) MyRequestPRs(repo, user string, maxResults int) ([]PRStatus, error) {
 	ctx := context.Background()
 	query := fmt.Sprintf("repo:%s is:pr label:%s author:%s", repo, RequestLabel, user)
-	result, _, err := c.client.Search.Issues(ctx, query, &gh.SearchOptions{
+	opts := &gh.SearchOptions{
 		Sort:        "created",
 		Order:       "desc",
 		ListOptions: gh.ListOptions{PerPage: 100},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("searching pull requests for %s: %w", repo, err)
 	}
 
-	out := make([]PRStatus, 0, len(result.Issues))
-	for _, issue := range result.Issues {
-		state := "closed"
-		switch issue.GetState() {
-		case "open":
-			state = "open"
-		default:
-			if issue.PullRequestLinks != nil && issue.PullRequestLinks.MergedAt != nil {
-				state = "merged"
+	var out []PRStatus
+	for {
+		result, resp, err := c.client.Search.Issues(ctx, query, opts)
+		if err != nil {
+			return nil, fmt.Errorf("searching pull requests for %s: %w", repo, err)
+		}
+		for _, issue := range result.Issues {
+			state := "closed"
+			switch issue.GetState() {
+			case "open":
+				state = "open"
+			default:
+				if issue.PullRequestLinks != nil && issue.PullRequestLinks.MergedAt != nil {
+					state = "merged"
+				}
+			}
+			out = append(out, PRStatus{
+				Repo:      repo,
+				Number:    issue.GetNumber(),
+				Title:     issue.GetTitle(),
+				Body:      issue.GetBody(),
+				State:     state,
+				URL:       issue.GetHTMLURL(),
+				CreatedAt: issue.GetCreatedAt().Time,
+			})
+			if maxResults > 0 && len(out) >= maxResults {
+				return out, nil
 			}
 		}
-		out = append(out, PRStatus{
-			Repo:      repo,
-			Number:    issue.GetNumber(),
-			Title:     issue.GetTitle(),
-			State:     state,
-			URL:       issue.GetHTMLURL(),
-			CreatedAt: issue.GetCreatedAt().Time,
-		})
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
 	}
 	return out, nil
 }
