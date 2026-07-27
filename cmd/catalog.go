@@ -188,7 +188,18 @@ func printSchemaHuman(r *config.Resource) error {
 
 	fmt.Printf("  %s %s\n", labelStyle.Render("PR target:"), r.Resolved.Repo+"/"+r.Resolved.TargetPath)
 	fmt.Printf("  %s %s\n", labelStyle.Render("Template:"), r.Resolved.TemplateRepo+"/"+r.Resolved.Template)
-	fmt.Printf("  %s %s\n\n", labelStyle.Render("Base branch:"), r.Resolved.BaseBranch)
+	fmt.Printf("  %s %s\n", labelStyle.Render("Base branch:"), r.Resolved.BaseBranch)
+	if r.OutputPath != "" {
+		outputs := r.OutputPath
+		if len(r.OutputKeys) > 0 {
+			outputs += "  " + ui.Subtle("("+strings.Join(r.OutputKeys, ", ")+")")
+		}
+		if r.OutputCloud != "" {
+			outputs += "  " + ui.Subtle("["+r.OutputCloud+"]")
+		}
+		fmt.Printf("  %s %s\n", labelStyle.Render("Outputs:"), outputs)
+	}
+	fmt.Println()
 
 	if len(r.Fields) == 0 {
 		fmt.Printf("  %s\n\n", ui.Subtle("No fields defined."))
@@ -279,6 +290,9 @@ type catalogResourceJSON struct {
 	Target      string             `json:"target"`
 	Template    string             `json:"template"`
 	BaseBranch  string             `json:"base_branch"`
+	OutputPath  string             `json:"output_path,omitempty"`
+	OutputKeys  []string           `json:"output_keys,omitempty"`
+	OutputCloud string             `json:"output_cloud,omitempty"`
 	Fields      []catalogFieldJSON `json:"fields"`
 }
 
@@ -303,6 +317,9 @@ func toSchemaJSON(r *config.Resource) catalogResourceJSON {
 		Target:      r.Resolved.Repo + "/" + r.Resolved.TargetPath,
 		Template:    r.Resolved.TemplateRepo + "/" + r.Resolved.Template,
 		BaseBranch:  r.Resolved.BaseBranch,
+		OutputPath:  r.OutputPath,
+		OutputKeys:  r.OutputKeys,
+		OutputCloud: r.OutputCloud,
 		Fields:      fields,
 	}
 }
