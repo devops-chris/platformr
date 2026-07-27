@@ -260,6 +260,69 @@ pr_title    = 'feat(vpc): add {{.name}} in {{.account}}/{{if ne .environment "pr
 > **Note:** Use TOML literal strings (single quotes `'...'`) when your template
 > contains double quotes. Literal strings are not processed for escape sequences.
 
+### `output_path` — where applied outputs will land
+
+platformr opens the PR; it doesn't apply anything or know what your CI/CD,
+Atlantis, or a human running `terraform apply` produces afterward. If a
+resource has outputs worth surfacing later (an RDS endpoint, an ARN, etc.),
+set `output_path` to tell platformr where to point developers once it's
+applied:
+
+```toml
+[[resources]]
+name = "rds"
+...
+output_path = "cloud/aws/{{.account}}/{{.environment}}/{{.region}}/{{.resource}}/{{.name}}/"
+```
+
+Supports the same `{{.field}}` interpolation as `target_path`. platformr only
+renders and **displays** this string after opening the PR — it never reads or
+writes anything there itself, and has no opinion on what backend or IaC tool
+you use to actually populate it (SSM, Vault, or anything else; Terraform,
+Crossplane, or anything else). It's a contract the platform team asserts, not
+something platformr can verify or derive from the template — leave it unset
+for resources that don't have outputs wired up yet.
+
+A bare prefix isn't very actionable on its own — you'd be guessing at key
+names. Add `output_keys` to name the individual keys that will exist under
+that prefix (e.g. an RDS endpoint, port, and ARN):
+
+```toml
+output_path = "cloud/aws/{{.account}}/{{.environment}}/{{.region}}/{{.resource}}/{{.name}}/"
+output_keys = ["endpoint", "port", "arn"]
+```
+
+platformr then prints the full path per key instead of just the prefix:
+
+```
+Once applied, outputs should be written to:
+    endpoint       cloud/aws/pt-chiro-ct-stg-services/dev/use1/rds/my-service/endpoint
+    port           cloud/aws/pt-chiro-ct-stg-services/dev/use1/rds/my-service/port
+    arn            cloud/aws/pt-chiro-ct-stg-services/dev/use1/rds/my-service/arn
+```
+
+Same contract as `output_path` — the platform team asserts these are the keys
+that will exist; platformr never verifies it against what's actually written.
+If a module's outputs change, keeping this list in sync is on the same team
+that already owns making `output_path` true. `output_keys` is ignored if
+`output_path` isn't set.
+
+### `output_cloud` — which platform the values live in
+
+Optional metadata: `"aws"`, `"azure"`, or `"gcp"` — the same `Cloud` convention
+used by [cloudctx](https://github.com/devops-chris/cloudctx), rather than a
+new one invented here.
+
+```toml
+output_cloud = "aws"
+```
+
+platformr doesn't act on this today — nothing yet knows how to fetch a value
+from more than one backend. It's recorded now so the schema won't need to
+change later, once something (`lockr` or otherwise) actually supports more
+than AWS. Shown alongside the outputs in `platformr status`. Ignored if
+`output_path` isn't set.
+
 ---
 
 ## Resource display names
