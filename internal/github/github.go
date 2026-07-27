@@ -268,9 +268,16 @@ type PRStatus struct {
 // not an arbitrary truncation) — pass 0 to paginate through every result with no
 // limit at all. Without a bound, a caller wanting only the most recent handful
 // would otherwise still pay for full pagination across however much history exists.
+//
+// Filtering by author happens server-side (GitHub search's author: qualifier
+// has proven reliable); filtering by label does not — confirmed directly that
+// GitHub's label: search filter can keep matching a PR for hours after its
+// label was removed, even though the very same search response's own Labels
+// field for that PR is already correct. So the label check happens client-side
+// against that field instead of trusting the query clause for it.
 func (c *Client) MyRequestPRs(repo, user string, maxResults int) ([]PRStatus, error) {
 	ctx := context.Background()
-	query := fmt.Sprintf("repo:%s is:pr label:%s author:%s", repo, RequestLabel, user)
+	query := fmt.Sprintf("repo:%s is:pr author:%s", repo, user)
 	opts := &gh.SearchOptions{
 		Sort:        "created",
 		Order:       "desc",
@@ -284,6 +291,9 @@ func (c *Client) MyRequestPRs(repo, user string, maxResults int) ([]PRStatus, er
 			return nil, fmt.Errorf("searching pull requests for %s: %w", repo, err)
 		}
 		for _, issue := range result.Issues {
+			if !hasLabel(issue, RequestLabel) {
+				continue
+			}
 			state := "closed"
 			switch issue.GetState() {
 			case "open":
@@ -312,6 +322,16 @@ func (c *Client) MyRequestPRs(repo, user string, maxResults int) ([]PRStatus, er
 		opts.Page = resp.NextPage
 	}
 	return out, nil
+}
+
+// hasLabel reports whether issue currently carries a label named name.
+func hasLabel(issue *gh.Issue, name string) bool {
+	for _, l := range issue.Labels {
+		if l.GetName() == name {
+			return true
+		}
+	}
+	return false
 }
 
 // ensureRequestLabel creates the RequestLabel label in repo if it doesn't already exist.
