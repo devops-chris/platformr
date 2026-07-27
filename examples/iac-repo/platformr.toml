@@ -27,6 +27,13 @@ description  = "Add a new ECR repository with IAM push access"
 template_dir = "platformr/templates/ecr"
 pr_title     = "feat(ecr): add {{.name}} repository"
 
+  # Once applied, the repository's outputs are expected here — see
+  # docs/configuration.md's "output_path" / "output_keys" section. platformr
+  # only renders and displays these paths; it never reads or writes them.
+  output_path  = "cloud/aws/{{.account}}/global/ecr/{{.name}}/"
+  output_keys  = ["repository_url", "arn"]
+  output_cloud = "aws"
+
   # oidc.tf is account-level — only one OIDC provider is needed per account.
   # Skip it if the account already has one rather than duplicating.
   [[resources.template_files]]

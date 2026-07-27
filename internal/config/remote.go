@@ -70,6 +70,24 @@ type Resource struct {
 	TeamReviewers    []string             `toml:"team_reviewers"` // GitHub team slugs auto-requested on every PR for this resource
 	Fields           []Field              `toml:"fields"`
 	TemplateFiles    []TemplateFileConfig `toml:"template_files"` // per-file metadata for multi-file mode
+	// OutputPath is a platform-team-asserted contract, not something derived from the
+	// template: "once applied, outputs for this resource will be written under this path."
+	// Supports {{.field}} interpolation like TargetPath. IaC-agnostic and backend-agnostic —
+	// platformr only renders and displays the string, it never reads or writes anything there.
+	// Absent means this resource doesn't have output support wired up.
+	OutputPath string `toml:"output_path"`
+	// OutputKeys names the individual keys written under OutputPath (e.g. "endpoint",
+	// "port", "arn"), so platformr can display full per-key paths instead of just the
+	// prefix. Same contract as OutputPath — the platform team asserts these are the
+	// keys that will exist, platformr never verifies it. Ignored if OutputPath is unset.
+	OutputKeys []string `toml:"output_keys"`
+	// OutputCloud is metadata only — "aws", "azure", or "gcp", matching the same
+	// Cloud convention used by the author's cloudctx tool. platformr doesn't act on
+	// it today (nothing yet knows how to fetch values from more than one backend),
+	// but recording it now means the schema won't need to change once lockr (or
+	// whatever fetches values) actually supports more than AWS. Ignored if
+	// OutputPath is unset.
+	OutputCloud string `toml:"output_cloud"`
 	// Resolved is populated by the resolver after loading. Do not set in TOML.
 	Resolved ResolvedResource `toml:"-"`
 }
