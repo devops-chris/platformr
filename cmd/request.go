@@ -232,7 +232,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 				Branch:        fmt.Sprintf("platformr/%s-%s", resource.Name, resolveSlug(resource, values)),
 				BaseBranch:    resource.Resolved.BaseBranch,
 				Title:         template.RenderString(resource.PRTitle, values, remote.MapsFor(resource, repos)),
-				Body:          buildPRBody(resource.Name, values, comment),
+				Body:          buildPRBody(resource.Name, values, comment, outputSectionMarkdown(resource, values, repos)),
 				Files:         prFiles,
 				Reviewers:     reviewers,
 				TeamReviewers: teamReviewers,
@@ -244,8 +244,73 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating PR: %w", withAuthHint(prErr, binaryName))
 	}
 
-	fmt.Println(ui.Success("PR opened: " + prURL))
+	fmt.Println(ui.Success("PR opened: " + hyperlink(prURL)))
+	printOutputPath(resource, values, repos)
 	return nil
+}
+
+// resolveOutputPrefix renders a resource's output_path with the given values, or
+// returns "" if output_path isn't configured. Shared by the terminal printout and
+// the PR body section so both stay in sync from one computation.
+//
+// {{.resource}} is only handled by resolver.go's renderPattern for target_path/
+// template_dir — add it here too so output_path can use the same placeholder.
+func resolveOutputPrefix(resource config.Resource, values map[string]string, repos []*config.RepoConfig) string {
+	if resource.OutputPath == "" {
+		return ""
+	}
+	ctxValues := copyMap(values)
+	ctxValues["resource"] = resource.Name
+	return template.RenderString(resource.OutputPath, ctxValues, remote.MapsFor(resource, repos))
+}
+
+// printOutputPath shows where this resource's outputs will land once applied, if the
+// platform team has configured output_path for it. platformr never reads or writes
+// anything there itself — this is purely informational.
+func printOutputPath(resource config.Resource, values map[string]string, repos []*config.RepoConfig) {
+	prefix := resolveOutputPrefix(resource, values, repos)
+	if prefix == "" {
+		return
+	}
+
+	if len(resource.OutputKeys) == 0 {
+		fmt.Println(ui.Subtle("Once applied, outputs should be written under: " + prefix))
+		return
+	}
+
+	fmt.Println(ui.Subtle("Once applied, outputs should be written to:"))
+	for _, key := range resource.OutputKeys {
+		fmt.Printf("    %-14s %s\n", key, ui.Subtle(prefix+key))
+	}
+}
+
+// outputSectionMarkdown returns a "### Outputs" section for the PR body, or "" if
+// output_path isn't configured. Embedding the already-rendered paths in the PR body
+// (rather than just printing them to the terminal) means `platformr status` can read
+// them back verbatim later — no re-deriving field values, no separate process to keep
+// in sync, no drift beyond someone hand-editing the PR description.
+func outputSectionMarkdown(resource config.Resource, values map[string]string, repos []*config.RepoConfig) string {
+	prefix := resolveOutputPrefix(resource, values, repos)
+	if prefix == "" {
+		return ""
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "\n%s\n\n", outputsHeading)
+	if resource.OutputCloud != "" {
+		fmt.Fprintf(&b, "Platform: %s\n\n", resource.OutputCloud)
+	}
+
+	if len(resource.OutputKeys) == 0 {
+		fmt.Fprintf(&b, "Once applied, outputs should be written under: `%s`\n", prefix)
+		return b.String()
+	}
+
+	fmt.Fprintf(&b, "Once applied, outputs should be written to:\n\n")
+	for _, key := range resource.OutputKeys {
+		fmt.Fprintf(&b, "- **%s**: `%s`\n", key, prefix+key)
+	}
+	return b.String()
 }
 
 // withAuthHint appends a re-auth hint to err when it's a GitHub 401 caused by an
@@ -434,7 +499,7 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 						Branch:     fmt.Sprintf("platformr/%s-%s", depResource.Name, resolveSlug(depResource, depValues)),
 						BaseBranch: depResource.Resolved.BaseBranch,
 						Title:      template.RenderString(depResource.PRTitle, depValues),
-						Body:       buildPRBody(depResource.Name, depValues, ""),
+						Body:       buildPRBody(depResource.Name, depValues, "", outputSectionMarkdown(depResource, depValues, repos)),
 						Files:      depFiles,
 					})
 				}).
@@ -444,7 +509,8 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 				return nil, fmt.Errorf("creating dependency PR: %w", withAuthHint(depErr, filepath.Base(os.Args[0])))
 			}
 
-			fmt.Println(ui.Success(fmt.Sprintf("%s PR opened: %s", resourceType, depPRURL)))
+			fmt.Println(ui.Success(fmt.Sprintf("%s PR opened: %s", resourceType, hyperlink(depPRURL))))
+			printOutputPath(depResource, depValues, repos)
 			fmt.Println(ui.Warning(fmt.Sprintf("Merge that PR before this %s is ready.", resource.Name)))
 			val = depValues["name"]
 		}
@@ -631,7 +697,7 @@ func printDryRun(resource config.Resource, values map[string]string, files []ghc
 	fmt.Println()
 }
 
-func buildPRBody(resourceName string, values map[string]string, comment string) string {
+func buildPRBody(resourceName string, values map[string]string, comment string, outputSection string) string {
 	body := fmt.Sprintf("## %s request\n\nOpened via `%s`\n\n### Details\n\n", resourceName, filepath.Base(os.Args[0]))
 	for k, v := range values {
 		body += fmt.Sprintf("- **%s**: %s\n", k, v)
@@ -639,5 +705,6 @@ func buildPRBody(resourceName string, values map[string]string, comment string) 
 	if comment != "" {
 		body += fmt.Sprintf("\n### Notes\n\n%s\n", comment)
 	}
+	body += outputSection
 	return body
 }
