@@ -130,8 +130,11 @@ func runRequest(cmd *cobra.Command, args []string) error {
 						tmplErr = fmt.Errorf("rendering %s: %w", tf.Name, err)
 						return
 					}
-					outName := template.RenderString(strings.TrimSuffix(tf.Name, ".tmpl"), values)
-					if skipPath := resolveSkipIfExists(resource, outName, values, resMaps); skipPath != "" {
+					// sourceName (unrendered) is the matching key against TemplateFiles config —
+					// unique on disk even when several files must render to the same outName.
+					sourceName := strings.TrimSuffix(tf.Name, ".tmpl")
+					outName := template.RenderString(sourceName, values)
+					if skipPath := resolveSkipIfExists(resource, sourceName, values, resMaps); skipPath != "" {
 						var exists bool
 						exists, _ = gh.FileExists(resource.Resolved.Repo, skipPath)
 						if exists {
@@ -139,8 +142,11 @@ func runRequest(cmd *cobra.Command, args []string) error {
 							continue
 						}
 					}
+					if override := resolveOutputName(resource, sourceName, values, resMaps); override != "" {
+						outName = override
+					}
 					filePath := targetPath + outName
-					if override := resolveFileTargetPath(resource, outName, values, resMaps); override != "" {
+					if override := resolveFileTargetPath(resource, sourceName, values, resMaps); override != "" {
 						filePath = override + outName
 					}
 					prFiles = append(prFiles, ghclient.PRFile{
@@ -461,16 +467,20 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 								depErr = fmt.Errorf("rendering %s: %w", tf.Name, err)
 								return
 							}
-							outName := strings.TrimSuffix(tf.Name, ".tmpl")
-							if skipPath := resolveSkipIfExists(depResource, outName, depValues, nil); skipPath != "" {
+							sourceName := strings.TrimSuffix(tf.Name, ".tmpl")
+							outName := sourceName
+							if skipPath := resolveSkipIfExists(depResource, sourceName, depValues, nil); skipPath != "" {
 								var exists bool
 								exists, _ = gh.FileExists(depResource.Resolved.Repo, skipPath)
 								if exists {
 									continue
 								}
 							}
+							if override := resolveOutputName(depResource, sourceName, depValues, nil); override != "" {
+								outName = override
+							}
 							depFilePath := targetPath + outName
-							if override := resolveFileTargetPath(depResource, outName, depValues, nil); override != "" {
+							if override := resolveFileTargetPath(depResource, sourceName, depValues, nil); override != "" {
 								depFilePath = override + outName
 							}
 							depFiles = append(depFiles, ghclient.PRFile{
@@ -586,9 +596,24 @@ func buildFieldContext(field config.Field, resource config.Resource, repos []*co
 		return nil
 	}
 
+	// Resolved.TargetPath ends in the dependency's own dynamic instance segment (e.g.
+	// "vpc/{{.name}}/") — rendering that against THIS request's values would substitute
+	// {{.name}} with the CURRENT resource's name (e.g. the eks cluster being created),
+	// not list what VPC names already exist. Strip that last segment first so we list
+	// its parent directory (e.g. "vpc/") instead, then render the rest (account/env/
+	// region) against this request's actual answers, same as "dirs:" already does.
+	parentPattern := parentTargetPath(depResource.Resolved.TargetPath)
+	resolvedTargetPath := template.RenderString(parentPattern, values, remote.MapsFor(resource, repos))
+
 	return &prompt.FieldContext{
 		ListFiles: func(_, _ string) ([]string, error) {
-			return gh.ListFiles(depResource.Resolved.Repo, depResource.Resolved.TargetPath)
+			// Multi-file resources (the norm — anything using template_dir) commit each
+			// instance as a directory (e.g. vpc/{{.name}}/), not a flat file, so listing
+			// existing instances means listing subdirectories, not files.
+			if depResource.Resolved.TemplateDir != "" {
+				return gh.ListDirs(depResource.Resolved.Repo, resolvedTargetPath, "")
+			}
+			return gh.ListFiles(depResource.Resolved.Repo, resolvedTargetPath)
 		},
 	}
 }
@@ -630,12 +655,39 @@ func firstFieldName(resource config.Resource) string {
 	return "name"
 }
 
-// resolveSkipIfExists returns the rendered skip_if_exists path for the given output filename,
-// or "" if no matching entry is configured.
-func resolveSkipIfExists(resource config.Resource, outName string, values map[string]string, maps map[string]map[string]string) string {
+// parentTargetPath strips the last path segment off a target_path pattern, e.g.
+// "cloud/aws/{{.account}}/vpc/{{.name}}/" -> "cloud/aws/{{.account}}/vpc/". Used to list
+// what instances of a dependency resource already exist without assuming that trailing
+// segment is literally named "{{.name}}" — it works for whatever the last segment is.
+func parentTargetPath(pattern string) string {
+	trimmed := strings.TrimSuffix(pattern, "/")
+	idx := strings.LastIndex(trimmed, "/")
+	if idx == -1 {
+		return ""
+	}
+	return trimmed[:idx+1]
+}
+
+// resolveSkipIfExists returns the rendered skip_if_exists path for the given source
+// filename (unrendered, matches TemplateFileConfig.Name), or "" if none is configured.
+func resolveSkipIfExists(resource config.Resource, sourceName string, values map[string]string, maps map[string]map[string]string) string {
 	for _, tf := range resource.TemplateFiles {
-		if tf.Name == outName && tf.SkipIfExists != "" {
+		if tf.Name == sourceName && tf.SkipIfExists != "" {
 			return template.RenderString(tf.SkipIfExists, values, maps)
+		}
+	}
+	return ""
+}
+
+// resolveOutputName returns the rendered output_name override for the given source
+// filename (unrendered, matches TemplateFileConfig.Name), or "" if none is configured —
+// callers fall back to the file's own rendered name. Needed when multiple source files
+// must render to the identical final filename (e.g. several "terragrunt.hcl" files in
+// different directories) — source names disambiguate the match, this decides the output.
+func resolveOutputName(resource config.Resource, sourceName string, values map[string]string, maps map[string]map[string]string) string {
+	for _, tf := range resource.TemplateFiles {
+		if tf.Name == sourceName && tf.OutputName != "" {
+			return template.RenderString(tf.OutputName, values, maps)
 		}
 	}
 	return ""

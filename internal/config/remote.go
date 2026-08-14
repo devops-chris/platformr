@@ -114,10 +114,17 @@ type ResolvedResource struct {
 }
 
 // TemplateFileConfig holds per-file settings for multi-file template mode.
-// Each entry matches a rendered output filename (the template name minus the .tmpl suffix).
+// Each entry matches a SOURCE .tmpl filename (minus the .tmpl suffix, unrendered) — not
+// the rendered output name. Matching on the source name (which is unique on disk) rather
+// than the rendered name is what lets multiple source files (e.g. "terragrunt.hcl.tmpl",
+// "eip-terragrunt.hcl.tmpl", "twingate-terragrunt.hcl.tmpl") each get their own
+// target_path/output_name override even when several of them need to render to the exact
+// same final filename (e.g. "terragrunt.hcl", required by Terragrunt) in different
+// directories — matching on the rendered name would make those indistinguishable.
 type TemplateFileConfig struct {
-	Name         string `toml:"name"`           // output filename, e.g. "oidc.tf"
+	Name         string `toml:"name"`           // source filename minus .tmpl, e.g. "eip-terragrunt.hcl"
 	TargetPath   string `toml:"target_path"`    // directory in target repo; overrides the resource-level target_path for this file
+	OutputName   string `toml:"output_name"`    // overrides the rendered output filename (supports {{.field}} interpolation); use when the source filename can't just be the desired output name, e.g. multiple files that must all become "terragrunt.hcl"
 	SkipIfExists string `toml:"skip_if_exists"` // path in target repo; skip this file if it already exists
 }
 
