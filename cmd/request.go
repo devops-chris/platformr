@@ -97,7 +97,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	}
 
 	// Collect field values
-	values, err := collectFields(resource, repos, gh, ghWrite)
+	values, err := collectFields(resource, repos, gh, ghWrite, nil)
 	if err != nil {
 		return err
 	}
@@ -415,10 +415,20 @@ func pickFromList(title, description string, resources []config.Resource) (confi
 	return config.Resource{}, fmt.Errorf("resource %q not found", selected)
 }
 
-func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, ghWrite *ghclient.Client) (map[string]string, error) {
+func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, ghWrite *ghclient.Client, seed map[string]string) (map[string]string, error) {
 	values := make(map[string]string)
+	for k, v := range seed {
+		values[k] = v
+	}
 
 	for _, field := range resource.Fields {
+		// Already answered by the caller (e.g. inline dependency creation reusing
+		// account/environment/region already picked for the resource that triggered
+		// it) — don't ask again.
+		if _, already := values[field.Name]; already {
+			continue
+		}
+
 		// Evaluate conditional — skip field and set to "" if condition is not met
 		if field.When != "" && template.RenderString(field.When, values, remote.MapsFor(resource, repos)) != "true" {
 			values[field.Name] = ""
@@ -458,7 +468,7 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 			}
 
 			fmt.Println(ui.Warning(fmt.Sprintf("Creating a new %s first...", resourceType)))
-			depValues, err := collectFields(depResource, repos, gh, ghWrite)
+			depValues, err := collectFields(depResource, repos, gh, ghWrite, sharedFieldSeed(depResource, values))
 			if err != nil {
 				return nil, err
 			}
@@ -654,13 +664,60 @@ func resolveFilePath(resource config.Resource, values map[string]string) string 
 	return targetPath + fileName + ext
 }
 
-// resolveSlug returns a short identifier for branch names.
+// resolveSlug returns a short identifier for branch names, unique enough that two
+// different requests never collide on the same branch. Defaulting to just the
+// first field's value (e.g. "account") isn't enough — every resource in this repo
+// starts with an "account" field, so two requests for the same resource type in
+// the same account (different env/region/name) would render the same branch name
+// and the second one's CreatePR would 422 on "Reference already exists". Deriving
+// the default from the resource's own rendered target_path instead ties the slug
+// to everything that actually makes the request unique.
 func resolveSlug(resource config.Resource, values map[string]string) string {
-	slug := resource.FileName
-	if slug == "" {
-		slug = "{{." + firstFieldName(resource) + "}}"
+	if resource.FileName != "" {
+		return template.RenderString(resource.FileName, values)
 	}
-	return template.RenderString(slug, values)
+	targetPath := template.RenderString(resource.Resolved.TargetPath, values)
+	return slugify(targetPath)
+}
+
+// slugify turns a rendered path (or any string) into a branch-name-safe slug:
+// lowercase, "/" and whitespace collapsed to "-", anything else not
+// alphanumeric/hyphen stripped, leading/trailing hyphens trimmed.
+func slugify(s string) string {
+	s = strings.ToLower(s)
+	var b strings.Builder
+	prevDash := false
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z' || r >= '0' && r <= '9':
+			b.WriteRune(r)
+			prevDash = false
+		case !prevDash:
+			b.WriteByte('-')
+			prevDash = true
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}
+
+// sharedFieldSeed carries account/environment/region straight through into an
+// inline dependency creation (e.g. picking "[+ create new]" on eks's vpc_name
+// field) so it doesn't re-ask questions the parent request already answered.
+// Only these three are safe to copy blindly — every resource in this repo scopes
+// its target_path by them, but per-instance identity fields like "name" must stay
+// independent (the new vpc's name isn't the eks cluster's name).
+func sharedFieldSeed(dep config.Resource, values map[string]string) map[string]string {
+	seed := make(map[string]string)
+	depFieldNames := make(map[string]bool, len(dep.Fields))
+	for _, f := range dep.Fields {
+		depFieldNames[f.Name] = true
+	}
+	for _, name := range []string{"account", "environment", "region"} {
+		if depFieldNames[name] && values[name] != "" {
+			seed[name] = values[name]
+		}
+	}
+	return seed
 }
 
 // firstFieldName returns the name of the first field defined on the resource.

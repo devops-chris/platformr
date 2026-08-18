@@ -58,6 +58,7 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 	sel := huh.NewSelect[string]().
 		Title(label).
 		Options(toHuhOptions(options)...).
+		Filtering(true).
 		Value(&val)
 	sel.WithTheme(ui.Theme())
 	if err := sel.Run(); err != nil {
