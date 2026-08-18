@@ -13,12 +13,15 @@ name        = "database"
 description = "Request a new RDS database"
 pr_title    = "feat(db): add {{.name}}"
 
+  # "project" lives in a different repo (acme-corp/platform-claims), and dirs:/
+  # files: sources only ever list within THIS repo — so there's no dynamic
+  # picker here. Type the project name that was used there; platformr doesn't
+  # verify it's real.
   [[resources.fields]]
-  name         = "project"
-  type         = "select"
-  label        = "Select project"
-  source       = "resource.project"   # reads from platform-claims/claims/project/
-  allow_create = true
+  name        = "project"
+  type        = "input"
+  label       = "Project name (from platform-claims)"
+  placeholder = "payments"
 
   [[resources.fields]]
   name        = "name"

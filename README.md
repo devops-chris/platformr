@@ -39,6 +39,9 @@ platformr auth
 # Make a request
 platformr request
 
+# Preview what a request would render — no PR opened
+platformr request vpc --dry-run
+
 # See what's available
 platformr catalog
 platformr catalog service        # field-level schema
@@ -223,6 +226,7 @@ with a `401 Bad credentials` error, run `platformr auth` again to reauthorize.
 | `platformr auth` | Authorize PR creation via GitHub App device flow |
 | `platformr auth logout` | Remove stored authorization token |
 | `platformr request` | Interactively request a new resource |
+| `platformr request <name> --dry-run` | Show computed values and rendered output — no PR opened |
 | `platformr catalog` | List available resource types |
 | `platformr catalog <name>` | Show field schema for a resource |
 | `platformr catalog --json` | Machine-readable schema output |

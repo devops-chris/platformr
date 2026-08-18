@@ -14,11 +14,6 @@ through the full org configuration:
 
 Goal: platform team can go from zero to a working org config in one command.
 
-### `platformr request --dry-run`
-Runs the full interactive flow but skips PR creation, printing the rendered
-template output instead. Useful for testing config and templates without
-touching GitHub.
-
 ### Remote config caching
 Cache fetched `platformr.toml` configs locally with a configurable TTL.
 Reduces GitHub API calls on every `request` and `catalog` invocation, and

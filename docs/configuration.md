@@ -444,7 +444,9 @@ No configuration required — this prompt appears on all resource types.
 | type | behaviour |
 |---|---|
 | `input` | Free-text input. Supports `default`, `placeholder`, `validate`, and `optional`. |
-| `select` | Dropdown. Populated from `options` (static) or `source` (dynamic). Supports `optional`. |
+| `select` | Dropdown. Populated from `options` (static) or `source` (dynamic). Supports `optional`, `allow_create`. |
+| `computed` | No prompt — derives its value from a Go template expression. See [Computed fields](#computed-fields). |
+| `reviewer` / `team_reviewer` | Like `select`, but the chosen value is also added to the PR's reviewers. See [Selectable reviewers](#selectable-reviewers-developer-chosen). |
 
 ### Optional fields
 
@@ -492,19 +494,6 @@ label   = "Environment"
 options = ["dev", "stg", "prod"]
 ```
 
-### Dynamic select — `source = "resource.<type>"`
-
-Reads existing deployed resources of another type from GitHub and presents them
-as options. Useful for dependencies (e.g. pick an existing VPC before creating an RDS).
-
-```toml
-[[resources.fields]]
-name         = "vpc"
-type         = "select"
-source       = "resource.vpc"   # lists files in vpc resource's target_path
-allow_create = true             # adds "[+ create new]" — runs the vpc request flow inline
-```
-
 ### Stripping prefixes from dynamic sources
 
 When directory or file names include a structural prefix that shouldn't be exposed
@@ -527,7 +516,7 @@ To reconstruct the original dir name in `target_path_suffix`, prepend the prefix
 target_path_suffix = "platform-{{.project}}/"
 ```
 
-`strip_prefix` applies to `dirs:`, `resource.<type>`, `team:`, and `collaborators` sources.
+`strip_prefix` applies to `dirs:`, `files:`, `team:`, and `collaborators` sources.
 
 ### Dynamic select — `source = "dirs:<path>"`
 
@@ -573,6 +562,55 @@ strip_prefix = "platform-"
 
 Fields are resolved in order — a `{{.field}}` expression is only valid if that field
 appears earlier in the list.
+
+### Dynamic select — `source = "files:<path>"`
+
+Same as `dirs:`, but for resource types committed as **one flat file per
+instance** instead of one directory per instance — i.e. resources using
+`template_path` (single-file mode) rather than `template_dir_path`. Lists file
+names at the given path, with the extension stripped:
+
+```toml
+# A "project" is one file: claims/project/payments.yaml
+[[resources.fields]]
+name   = "project"
+type   = "select"
+label  = "Which project is this service part of?"
+source = "files:claims/project"   # → lists claims/project/*, minus extension
+```
+
+Use `dirs:` when instances are directories, `files:` when instances are flat
+files. Both only ever look inside **the same repo** the current `platformr.toml`
+lives in — neither can list resources defined in a different IaC repo, even one
+also registered in the org config.
+
+### `allow_create` — let the developer type a value instead of picking one
+
+Add `allow_create = true` to any `dirs:`/`files:`-sourced select field to offer
+a way out when the list doesn't have what they need — a value from an older
+naming convention, something created by hand, or a resource type this repo just
+doesn't track the way `dirs:`/`files:` expects:
+
+```toml
+[[resources.fields]]
+name         = "vpc_name"
+type         = "select"
+label        = "VPC this cluster lives in"
+source       = "dirs:cloud/aws/{{.account}}/{{.region}}/vpc"
+allow_create = true
+```
+
+- If the list has existing options, `[+ create new]` is added at the bottom.
+  Picking it re-prompts as a plain text box.
+- If the list is empty, there's nothing to pick from — platformr skips the
+  select entirely and goes straight to that same text box.
+
+Either way, whatever gets typed is used as-is: **no validation that it matches
+anything real, and nothing gets created.** `allow_create` only decides which
+input widget to show; it has no side effects. If a field genuinely needs "the
+value must be a real, existing thing," pair it with a template check on the
+receiving end, or leave `allow_create` off so the developer can only pick from
+what's actually there.
 
 ### Computed fields
 
