@@ -147,7 +147,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 					outName := template.RenderString(sourceName, values)
 					if skipPath := resolveSkipIfExists(resource, sourceName, values, resMaps); skipPath != "" {
 						var exists bool
-						exists, _ = gh.FileExists(resource.Resolved.Repo, skipPath)
+						exists, _ = gh.FileExists(resource.Resolved.Repo, skipPath, resource.Resolved.BaseBranch)
 						if exists {
 							skippedFiles = append(skippedFiles, outName)
 							continue
@@ -464,7 +464,7 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 			_ = spinner.New().
 				Title(fmt.Sprintf("Checking if %q already exists...", val)).
 				Action(func() {
-					exists, _ = gh.FileExists(resource.Resolved.Repo, candidatePath)
+					exists, _ = gh.FileExists(resource.Resolved.Repo, candidatePath, resource.Resolved.BaseBranch)
 				}).
 				Run()
 
@@ -493,6 +493,17 @@ func buildFieldContext(field config.Field, resource config.Resource, repos []*co
 		return &prompt.FieldContext{
 			ListFiles: func(_, _ string) ([]string, error) {
 				return gh.ListDirs(resource.Resolved.TemplateRepo, dirPath, resource.Resolved.TemplateRef)
+			},
+		}
+	}
+
+	// Same idea as "dirs:", for resources committed as one flat file per instance
+	// (e.g. platform-project/foo.yaml) instead of one directory per instance.
+	if strings.HasPrefix(field.Source, "files:") {
+		filePath := template.RenderString(strings.TrimPrefix(field.Source, "files:"), values, remote.MapsFor(resource, repos))
+		return &prompt.FieldContext{
+			ListFiles: func(_, _ string) ([]string, error) {
+				return gh.ListFiles(resource.Resolved.TemplateRepo, filePath, resource.Resolved.TemplateRef)
 			},
 		}
 	}

@@ -114,13 +114,16 @@ func PromptComment() (string, error) {
 }
 
 // resolveOptions resolves the options for a select field: "dirs:<path>" lists
-// subdirectories, "team:<slug>" lists team members, "collaborators" lists repo
-// collaborators. For static options it returns field.Options directly.
+// subdirectories (one instance per directory), "files:<path>" lists files minus
+// their extension (one instance per file), "team:<slug>" lists team members,
+// "collaborators" lists repo collaborators. For static options it returns
+// field.Options directly.
 func resolveOptions(field config.Field, ctx *FieldContext) ([]string, error) {
 	if field.Source == "" {
 		return field.Options, nil
 	}
 	if !strings.HasPrefix(field.Source, "dirs:") &&
+		!strings.HasPrefix(field.Source, "files:") &&
 		!strings.HasPrefix(field.Source, "team:") &&
 		field.Source != "collaborators" {
 		return nil, fmt.Errorf("unknown source %q", field.Source)

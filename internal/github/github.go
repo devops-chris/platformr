@@ -139,12 +139,17 @@ func (c *Client) FetchTemplateDir(repo, dirPath, ref string) ([]TemplateFile, er
 }
 
 // ListFiles lists files in a directory and returns their names without extensions.
-func (c *Client) ListFiles(repo, path string) ([]string, error) {
+// ref is the branch/tag/SHA to query; empty string uses the repo's default branch.
+func (c *Client) ListFiles(repo, path, ref string) ([]string, error) {
 	owner, repoName, err := parseRepo(repo)
 	if err != nil {
 		return nil, err
 	}
-	_, contents, _, err := c.client.Repositories.GetContents(context.Background(), owner, repoName, path, nil)
+	var opts *gh.RepositoryContentGetOptions
+	if ref != "" {
+		opts = &gh.RepositoryContentGetOptions{Ref: ref}
+	}
+	_, contents, _, err := c.client.Repositories.GetContents(context.Background(), owner, repoName, path, opts)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, nil
@@ -243,13 +248,21 @@ func (c *Client) ListCollaborators(repo string) ([]string, error) {
 }
 
 // FileExists checks whether a file already exists at the given path in the repo.
-func (c *Client) FileExists(repo, path string) (bool, error) {
+// ref is the branch/tag/SHA to query; empty string uses the repo's default branch.
+// Callers checking whether a file already exists in a PR's target repo should pass
+// that resource's Resolved.BaseBranch — not leave this blank — since the repo's
+// actual default branch and where a PR will land aren't guaranteed to be the same.
+func (c *Client) FileExists(repo, path, ref string) (bool, error) {
 	owner, repoName, err := parseRepo(repo)
 	if err != nil {
 		return false, err
 	}
 
-	_, _, resp, err := c.client.Repositories.GetContents(context.Background(), owner, repoName, path, nil)
+	var opts *gh.RepositoryContentGetOptions
+	if ref != "" {
+		opts = &gh.RepositoryContentGetOptions{Ref: ref}
+	}
+	_, _, resp, err := c.client.Repositories.GetContents(context.Background(), owner, repoName, path, opts)
 	if err != nil {
 		if resp != nil && resp.StatusCode == 404 {
 			return false, nil
