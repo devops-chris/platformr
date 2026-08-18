@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/log"
+	"github.com/devops-chris/clihq/ui"
 	"github.com/devops-chris/platformr/internal/config"
 	"github.com/devops-chris/platformr/internal/remote"
 	"github.com/spf13/cobra"
@@ -15,6 +18,11 @@ var localCfg *config.LocalConfig
 
 var rootCmd = &cobra.Command{
 	Short: "Developer self-service platform CLI",
+	// Every error path already prints its own message below — cobra's default
+	// "Error: ..." + full usage dump on top of that made every failure (including
+	// just pressing Ctrl+C) look like a crash with a wall of unrelated flag text.
+	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 func Execute() {
@@ -28,7 +36,12 @@ request infrastructure and services via GitOps pull requests.
 Run '` + name + ` connect <org>' to get started.`
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		// Ctrl+C out of any prompt — not a failure, just say so and stop.
+		if errors.Is(err, huh.ErrUserAborted) {
+			fmt.Println(ui.Warning("Cancelled."))
+			os.Exit(0)
+		}
+		fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
 		os.Exit(1)
 	}
 }

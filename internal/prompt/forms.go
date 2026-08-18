@@ -41,17 +41,23 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 		return promptInput(label, field)
 	}
 
+	// Nothing to pick from — go straight to a plain prompt instead of forcing a
+	// select with a single "[+ create new]" entry and no other way out. This also
+	// applies when AllowCreate is set: a list of exactly one forced choice isn't a
+	// real choice.
+	if len(options) == 0 {
+		if field.AllowCreate {
+			fmt.Println(ui.Subtle("Nothing found to pick from — type a value below."))
+		}
+		return promptInput(label, field)
+	}
+
 	if field.Optional {
 		options = append([]string{"— skip —"}, options...)
 	}
 
 	if field.AllowCreate {
 		options = append(options, CreateNewOption)
-	}
-
-	// No options and no create — fall back to input
-	if len(options) == 0 {
-		return promptInput(label, field)
 	}
 
 	var val string
