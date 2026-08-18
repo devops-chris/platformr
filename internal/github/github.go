@@ -138,6 +138,9 @@ func (c *Client) ListFiles(repo, path string) ([]string, error) {
 	for _, item := range contents {
 		if item.GetType() == "file" {
 			name := item.GetName()
+			if strings.HasPrefix(name, "_") {
+				continue
+			}
 			if idx := strings.LastIndex(name, "."); idx > 0 {
 				name = name[:idx]
 			}
@@ -147,7 +150,9 @@ func (c *Client) ListFiles(repo, path string) ([]string, error) {
 	return names, nil
 }
 
-// ListDirs lists subdirectory names at a path in a GitHub repo.
+// ListDirs lists subdirectory names at a path in a GitHub repo. Names starting
+// with "_" are skipped — this repo's convention for internal/shared directories
+// (_common, _modules, etc.) that aren't real picker entries.
 // ref is the branch/tag/SHA to query; empty string uses the repo's default branch.
 func (c *Client) ListDirs(repo, path, ref string) ([]string, error) {
 	owner, repoName, err := parseRepo(repo)
@@ -164,7 +169,7 @@ func (c *Client) ListDirs(repo, path, ref string) ([]string, error) {
 	}
 	var names []string
 	for _, item := range contents {
-		if item.GetType() == "dir" {
+		if item.GetType() == "dir" && !strings.HasPrefix(item.GetName(), "_") {
 			names = append(names, item.GetName())
 		}
 	}

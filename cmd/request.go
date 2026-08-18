@@ -122,6 +122,11 @@ func runRequest(cmd *cobra.Command, args []string) error {
 					tmplErr = err
 					return
 				}
+				if len(tmplFiles) == 0 {
+					tmplErr = fmt.Errorf("no .tmpl files found in %s (repo %s, ref %q) — check template_dir_path and the configured ref",
+						resource.Resolved.TemplateDir, resource.Resolved.TemplateRepo, resource.Resolved.TemplateRef)
+					return
+				}
 				resMaps := remote.MapsFor(resource, repos)
 				targetPath := template.RenderString(resource.Resolved.TargetPath, values, resMaps)
 				for _, tf := range tmplFiles {
@@ -431,6 +436,17 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 		val, err := prompt.PromptField(field, values, ctx)
 		if err != nil {
 			return nil, err
+		}
+
+		// "[+ create new]" on a dirs:-sourced field means "let me type one instead of
+		// picking an existing directory" — there's no dependency resource to create,
+		// just fall through to a plain text prompt.
+		if val == prompt.CreateNewOption && strings.HasPrefix(field.Source, "dirs:") {
+			typed, err := prompt.PromptField(config.Field{Name: field.Name, Label: field.Label, Type: "input", Placeholder: field.Placeholder}, values, nil)
+			if err != nil {
+				return nil, err
+			}
+			val = typed
 		}
 
 		// Handle inline dependency creation
