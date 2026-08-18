@@ -63,7 +63,7 @@ pr_title    = "feat(service): add {{.name}}"
   type         = "select"
   label        = "Select project"
   source       = "files:claims/project"   # lists existing projects — one file per project
-  allow_create = true                     # falls through to a text box if none exist yet
+  allow_manual = true                     # falls through to a text box if none exist yet
 
   [[resources.fields]]
   name        = "name"

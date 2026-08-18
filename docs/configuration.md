@@ -444,7 +444,7 @@ No configuration required — this prompt appears on all resource types.
 | type | behaviour |
 |---|---|
 | `input` | Free-text input. Supports `default`, `placeholder`, `validate`, and `optional`. |
-| `select` | Dropdown. Populated from `options` (static) or `source` (dynamic). Supports `optional`, `allow_create`. |
+| `select` | Dropdown. Populated from `options` (static) or `source` (dynamic). Supports `optional`, `allow_manual`. |
 | `computed` | No prompt — derives its value from a Go template expression. See [Computed fields](#computed-fields). |
 | `reviewer` / `team_reviewer` | Like `select`, but the chosen value is also added to the PR's reviewers. See [Selectable reviewers](#selectable-reviewers-developer-chosen). |
 
@@ -584,33 +584,40 @@ files. Both only ever look inside **the same repo** the current `platformr.toml`
 lives in — neither can list resources defined in a different IaC repo, even one
 also registered in the org config.
 
-### `allow_create` — let the developer type a value instead of picking one
+### `allow_manual` — let the developer type a value instead of picking one
 
-Add `allow_create = true` to any `dirs:`/`files:`-sourced select field to offer
-a way out when the list doesn't have what they need — a value from an older
-naming convention, something created by hand, or a resource type this repo just
-doesn't track the way `dirs:`/`files:` expects:
+Add `allow_manual = true` to any `dirs:`/`files:`-sourced select field to offer
+a way to type a value instead of only picking from what's already there — useful
+when a real value might exist under an older naming convention, or was created
+by hand, or just doesn't exist yet:
 
 ```toml
 [[resources.fields]]
-name         = "vpc_name"
-type         = "select"
-label        = "VPC this cluster lives in"
-source       = "dirs:cloud/aws/{{.account}}/{{.region}}/vpc"
-allow_create = true
+name        = "vpc_name"
+type        = "select"
+label       = "VPC this cluster lives in"
+source      = "dirs:cloud/aws/{{.account}}/{{.region}}/vpc"
+allow_manual = true
 ```
 
-- If the list has existing options, `[+ create new]` is added at the bottom.
-  Picking it re-prompts as a plain text box.
+- If the list has existing options, `[+ enter manually]` is added at the
+  bottom. Picking it re-prompts as a plain text box.
 - If the list is empty, there's nothing to pick from — platformr skips the
   select entirely and goes straight to that same text box.
 
-Either way, whatever gets typed is used as-is: **no validation that it matches
-anything real, and nothing gets created.** `allow_create` only decides which
-input widget to show; it has no side effects. If a field genuinely needs "the
-value must be a real, existing thing," pair it with a template check on the
-receiving end, or leave `allow_create` off so the developer can only pick from
-what's actually there.
+**Important: typing a value does not create anything, and platformr never
+checks it against anything real.** It's a plain string that gets substituted
+into the template, full stop. Say `vpc_name` above is for an EKS cluster, and
+no VPC exists yet in that account — typing `new-vpc-1` doesn't create a VPC
+named `new-vpc-1`. It just makes the EKS template's `dependency` block point
+at `vpc/new-vpc-1`, a directory that doesn't exist. That VPC still has to be
+requested separately (`platformr request vpc`, naming it `new-vpc-1`) and
+merged + applied before the EKS unit will actually plan.
+
+So `allow_manual` doesn't solve "create this thing first" — it just doesn't
+*block* finishing the current request while that happens as its own separate
+step. If a field's value must always be something real and already applied,
+leave `allow_manual` off so the developer can only pick from what's there.
 
 ### Computed fields
 

@@ -31,9 +31,8 @@ func IsUnauthorized(err error) bool {
 // isNotFound reports whether err is a GitHub API 404 response — the signature of
 // a path that simply doesn't exist yet (e.g. no instances of a resource have ever
 // been created under it), as opposed to a real failure. Callers that list
-// directory/file contents treat this as "zero results", not an error, so pickers
-// correctly fall through to allow_create instead of silently degrading to a plain
-// text prompt.
+// directory/file contents treat this as "zero results", not an error, so an empty
+// list reaches the picker as an empty list rather than an error that masks it.
 func isNotFound(err error) bool {
 	var ghErr *gh.ErrorResponse
 	if errors.As(err, &ghErr) {

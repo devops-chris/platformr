@@ -255,8 +255,8 @@ func fieldFlags(f config.Field) string {
 	if f.Optional {
 		flags = append(flags, "optional")
 	}
-	if f.AllowCreate {
-		flags = append(flags, "allow create")
+	if f.AllowManual {
+		flags = append(flags, "manual entry allowed")
 	}
 	if f.Default != "" {
 		flags = append(flags, "default: "+f.Default)
@@ -274,7 +274,7 @@ type catalogFieldJSON struct {
 	Type         string   `json:"type"`
 	Label        string   `json:"label,omitempty"`
 	Source       string   `json:"source,omitempty"`
-	AllowCreate  bool     `json:"allow_create,omitempty"`
+	AllowManual  bool     `json:"allow_manual,omitempty"`
 	Options      []string `json:"options,omitempty"`
 	Default      string   `json:"default,omitempty"`
 	Validate     string   `json:"validate,omitempty"`
@@ -304,7 +304,7 @@ func toSchemaJSON(r *config.Resource) catalogResourceJSON {
 			Type:        f.Type,
 			Label:       f.Label,
 			Source:      f.Source,
-			AllowCreate: f.AllowCreate,
+			AllowManual: f.AllowManual,
 			Options:     f.Options,
 			Default:     f.Default,
 			Validate:    f.Validate,

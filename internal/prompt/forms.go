@@ -9,7 +9,7 @@ import (
 	"github.com/devops-chris/platformr/internal/config"
 )
 
-const CreateNewOption = "[+ create new]"
+const ManualEntryOption = "[+ enter manually]"
 
 // FieldContext provides runtime context for resolving dynamic field options.
 type FieldContext struct {
@@ -19,9 +19,8 @@ type FieldContext struct {
 }
 
 // PromptField renders an interactive prompt for a single resource field.
-// Returns CreateNewOption if the user picked "[+ create new]" instead of an
-// existing option — the caller decides what that means (e.g. falling through to
-// a plain text prompt for a "dirs:"-sourced field).
+// Returns ManualEntryOption if the user picked "[+ enter manually]" instead of
+// an existing option — the caller re-prompts as plain text in that case.
 func PromptField(field config.Field, values map[string]string, ctx *FieldContext) (string, error) {
 	label := field.Label
 	if label == "" {
@@ -44,11 +43,11 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 	}
 
 	// Nothing to pick from — go straight to a plain prompt instead of forcing a
-	// select with a single "[+ create new]" entry and no other way out. This also
-	// applies when AllowCreate is set: a list of exactly one forced choice isn't a
-	// real choice.
+	// select with a single "[+ enter manually]" entry and no other way out. This
+	// also applies when AllowManual is set: a list of exactly one forced choice
+	// isn't a real choice.
 	if len(options) == 0 {
-		if field.AllowCreate {
+		if field.AllowManual {
 			fmt.Println(ui.Subtle("Nothing found to pick from — type a value below."))
 		}
 		return promptInput(label, field)
@@ -58,8 +57,8 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 		options = append([]string{"— skip —"}, options...)
 	}
 
-	if field.AllowCreate {
-		options = append(options, CreateNewOption)
+	if field.AllowManual {
+		options = append(options, ManualEntryOption)
 	}
 
 	var val string

@@ -133,8 +133,8 @@ type Field struct {
 	Type         string   `toml:"type"`  // "input", "select", or "computed"
 	Value        string   `toml:"value"` // Go template expression for computed fields
 	Label        string   `toml:"label"`
-	Source       string   `toml:"source"`       // "dirs:<path>", "team:<slug>", or "collaborators" — dynamic options
-	AllowCreate  bool     `toml:"allow_create"` // offer "[+ create new]" alongside the listed options, falling through to a plain text prompt
+	Source       string   `toml:"source"`       // "dirs:<path>", "files:<path>", "team:<slug>", or "collaborators" — dynamic options
+	AllowManual  bool     `toml:"allow_manual"` // offer "[+ enter manually]" alongside the listed options, or go straight to a text prompt if the list is empty. Doesn't create or validate anything — the typed value is used as-is.
 	Options      []string `toml:"options"`      // static options for select
 	Default      string   `toml:"default"`
 	Validate     string   `toml:"validate"` // "unique" — checks target repo for conflicts

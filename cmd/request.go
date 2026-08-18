@@ -444,10 +444,10 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 			return nil, err
 		}
 
-		// "[+ create new]" on a dirs:-sourced field means "let me type one instead of
-		// picking an existing directory" — there's no dependency resource to create,
-		// just fall through to a plain text prompt.
-		if val == prompt.CreateNewOption && strings.HasPrefix(field.Source, "dirs:") {
+		// "[+ enter manually]" on a dirs:/files:-sourced field means "let me type a
+		// value instead of picking one" — just fall through to a plain text prompt.
+		if val == prompt.ManualEntryOption &&
+			(strings.HasPrefix(field.Source, "dirs:") || strings.HasPrefix(field.Source, "files:")) {
 			typed, err := prompt.PromptField(config.Field{Name: field.Name, Label: field.Label, Type: "input", Placeholder: field.Placeholder}, values, nil)
 			if err != nil {
 				return nil, err
