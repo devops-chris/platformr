@@ -50,6 +50,12 @@ func Resolve(orgCfg *OrgConfig, repo *RepoConfig) {
 
 		// Base branch
 		r.Resolved.BaseBranch = coalesce(r.BaseBranch, repo.Defaults.BaseBranch, orgCfg.Defaults.BaseBranch, "main")
+
+		// Per-file target_path overrides can reference {{.resource}} too — apply the
+		// same substitution here since these never go through the coalesce above.
+		for j := range r.TemplateFiles {
+			r.TemplateFiles[j].TargetPath = renderPattern(r.TemplateFiles[j].TargetPath, r.Name)
+		}
 	}
 }
 

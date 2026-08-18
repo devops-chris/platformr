@@ -60,6 +60,13 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	ghWrite := ghclient.New(writeToken)
 	loader := remote.New(readToken)
 
+	// Fail fast on a bad/expired write token — better than discovering it after a
+	// full round of prompts (and, for inline dependency creation, a PR already
+	// opened) only when CreatePR itself 401s.
+	if _, err := ghWrite.CurrentUser(); err != nil {
+		return withAuthHint(err, binaryName)
+	}
+
 	// Fetch all resource definitions from registered IaC repos
 	var repos []*config.RepoConfig // this is resolved in the spinner
 	var loadErr error
