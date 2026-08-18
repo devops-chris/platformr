@@ -306,13 +306,20 @@ type PRStatus struct {
 // limit at all. Without a bound, a caller wanting only the most recent handful
 // would otherwise still pay for full pagination across however much history exists.
 //
+// includeClosed controls whether closed-and-never-merged PRs count toward
+// maxResults and get returned at all. A closed-without-merge request is an
+// abandoned one — the common case doesn't want it taking up a slot in "20 most
+// recent" ahead of requests that are still open or actually landed. When false,
+// closed-unmerged PRs are skipped entirely rather than fetched-then-filtered,
+// so maxResults/pagination keep working correctly against what's actually kept.
+//
 // Filtering by author happens server-side (GitHub search's author: qualifier
 // has proven reliable); filtering by label does not — confirmed directly that
 // GitHub's label: search filter can keep matching a PR for hours after its
 // label was removed, even though the very same search response's own Labels
 // field for that PR is already correct. So the label check happens client-side
 // against that field instead of trusting the query clause for it.
-func (c *Client) MyRequestPRs(repo, user string, maxResults int) ([]PRStatus, error) {
+func (c *Client) MyRequestPRs(repo, user string, maxResults int, includeClosed bool) ([]PRStatus, error) {
 	ctx := context.Background()
 	query := fmt.Sprintf("repo:%s is:pr author:%s", repo, user)
 	opts := &gh.SearchOptions{
@@ -339,6 +346,9 @@ func (c *Client) MyRequestPRs(repo, user string, maxResults int) ([]PRStatus, er
 				if issue.PullRequestLinks != nil && issue.PullRequestLinks.MergedAt != nil {
 					state = "merged"
 				}
+			}
+			if state == "closed" && !includeClosed {
+				continue
 			}
 			out = append(out, PRStatus{
 				Repo:      repo,

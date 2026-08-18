@@ -51,14 +51,16 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Check the status of your requests",
 	Long: `Checks the IaC repos in your connected org for pull requests you opened via
-` + "`platformr request`" + ` and reports whether each is open, merged, or closed.`,
+` + "`platformr request`" + ` and reports whether each is open or merged.
+Closed-without-merge requests are hidden by default — pass --all to see them too.`,
 	Args: cobra.NoArgs,
 	RunE: runStatus,
 }
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
-	statusCmd.Flags().BoolVar(&statusAll, "all", false, fmt.Sprintf("Show all requests (default: most recent %d)", defaultStatusLimit))
+	statusCmd.Flags().BoolVar(&statusAll, "all", false, fmt.Sprintf(
+		"Show every request, including closed-without-merge, with no count limit (default: open + merged only, most recent %d)", defaultStatusLimit))
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
@@ -116,7 +118,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		Title("Checking PR status...").
 		Action(func() {
 			for repo := range targetRepos {
-				prs, err := gh.MyRequestPRs(repo, currentUser, perRepoLimit)
+				prs, err := gh.MyRequestPRs(repo, currentUser, perRepoLimit, statusAll)
 				if err != nil {
 					fetchErr = err
 					return
@@ -156,16 +158,25 @@ func runStatus(cmd *cobra.Command, args []string) error {
 // listed, and it's searchable (type/name, or just part of either) instead of
 // something you scroll through.
 func printStatusSummary(user string, prs []ghclient.PRStatus, mayHaveMore bool) {
-	open, closed := 0, 0
+	open, merged, closed := 0, 0, 0
 	for _, pr := range prs {
-		if pr.State == "open" {
+		switch pr.State {
+		case "open":
 			open++
-		} else {
+		case "merged":
+			merged++
+		default:
 			closed++
 		}
 	}
-	fmt.Printf("\n  %s  %s — %d open, %d merged/closed\n",
-		ui.SectionHeader("Your requests"), ui.Subtle(user), open, closed)
+	counts := fmt.Sprintf("%d open, %d merged", open, merged)
+	if closed > 0 {
+		// Only ever non-zero with --all — the default fetch already excludes
+		// closed-without-merge requests entirely.
+		counts += fmt.Sprintf(", %d closed", closed)
+	}
+	fmt.Printf("\n  %s  %s — %s\n",
+		ui.SectionHeader("Your requests"), ui.Subtle(user), counts)
 	if mayHaveMore {
 		fmt.Println(ui.Subtle(fmt.Sprintf("  Showing your %d most recent — run `platformr status --all` for your full history.", len(prs))))
 	}
