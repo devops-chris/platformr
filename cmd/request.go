@@ -60,9 +60,8 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	ghWrite := ghclient.New(writeToken)
 	loader := remote.New(readToken)
 
-	// Fail fast on a bad/expired write token — better than discovering it after a
-	// full round of prompts (and, for inline dependency creation, a PR already
-	// opened) only when CreatePR itself 401s.
+	// Fail fast on a bad/expired write token — better than discovering it only
+	// when CreatePR 401s, after a full round of prompts.
 	if _, err := ghWrite.CurrentUser(); err != nil {
 		return withAuthHint(err, binaryName)
 	}
@@ -104,7 +103,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	}
 
 	// Collect field values
-	values, err := collectFields(resource, repos, gh, ghWrite, nil)
+	values, err := collectFields(resource, repos, gh)
 	if err != nil {
 		return err
 	}
@@ -422,20 +421,10 @@ func pickFromList(title, description string, resources []config.Resource) (confi
 	return config.Resource{}, fmt.Errorf("resource %q not found", selected)
 }
 
-func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, ghWrite *ghclient.Client, seed map[string]string) (map[string]string, error) {
+func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client) (map[string]string, error) {
 	values := make(map[string]string)
-	for k, v := range seed {
-		values[k] = v
-	}
 
 	for _, field := range resource.Fields {
-		// Already answered by the caller (e.g. inline dependency creation reusing
-		// account/environment/region already picked for the resource that triggered
-		// it) — don't ask again.
-		if _, already := values[field.Name]; already {
-			continue
-		}
-
 		// Evaluate conditional — skip field and set to "" if condition is not met
 		if field.When != "" && template.RenderString(field.When, values, remote.MapsFor(resource, repos)) != "true" {
 			values[field.Name] = ""
@@ -464,98 +453,6 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 				return nil, err
 			}
 			val = typed
-		}
-
-		// Handle inline dependency creation
-		if val == prompt.CreateNewOption {
-			resourceType := strings.TrimPrefix(field.Source, "resource.")
-			depResource, found := remote.FindResource(resourceType, repos)
-			if !found {
-				return nil, fmt.Errorf("dependency resource type %q not found", resourceType)
-			}
-
-			fmt.Println(ui.Warning(fmt.Sprintf("Creating a new %s first...", resourceType)))
-			depValues, err := collectFields(depResource, repos, gh, ghWrite, sharedFieldSeed(depResource, values))
-			if err != nil {
-				return nil, err
-			}
-
-			// Open the dependency PR inline
-			var depPRURL string
-			var depErr error
-			_ = spinner.New().
-				Title(fmt.Sprintf("Opening PR for new %s...", resourceType)).
-				Action(func() {
-					var depFiles []ghclient.PRFile
-					if depResource.Resolved.TemplateDir != "" {
-						tmplFiles, err := gh.FetchTemplateDir(depResource.Resolved.TemplateRepo, depResource.Resolved.TemplateDir, depResource.Resolved.TemplateRef)
-						if err != nil {
-							depErr = err
-							return
-						}
-						targetPath := template.RenderString(depResource.Resolved.TargetPath, depValues)
-						for _, tf := range tmplFiles {
-							rendered, err := template.Render(tf.Content, depValues)
-							if err != nil {
-								depErr = fmt.Errorf("rendering %s: %w", tf.Name, err)
-								return
-							}
-							sourceName := strings.TrimSuffix(tf.Name, ".tmpl")
-							outName := sourceName
-							if skipPath := resolveSkipIfExists(depResource, sourceName, depValues, nil); skipPath != "" {
-								var exists bool
-								exists, _ = gh.FileExists(depResource.Resolved.Repo, skipPath)
-								if exists {
-									continue
-								}
-							}
-							if override := resolveOutputName(depResource, sourceName, depValues, nil); override != "" {
-								outName = override
-							}
-							depFilePath := targetPath + outName
-							if override := resolveFileTargetPath(depResource, sourceName, depValues, nil); override != "" {
-								depFilePath = override + outName
-							}
-							depFiles = append(depFiles, ghclient.PRFile{
-								Path:    depFilePath,
-								Content: rendered,
-							})
-						}
-					} else {
-						tmplContent, err := gh.FetchFile(depResource.Resolved.TemplateRepo, depResource.Resolved.Template, depResource.Resolved.TemplateRef)
-						if err != nil {
-							depErr = err
-							return
-						}
-						rendered, err := template.Render(tmplContent, depValues)
-						if err != nil {
-							depErr = err
-							return
-						}
-						depFiles = []ghclient.PRFile{{
-							Path:    resolveFilePath(depResource, depValues),
-							Content: rendered,
-						}}
-					}
-					depPRURL, depErr = ghWrite.CreatePR(ghclient.PRRequest{
-						Repo:       depResource.Resolved.Repo,
-						Branch:     fmt.Sprintf("platformr/%s-%s", depResource.Name, resolveSlug(depResource, depValues)),
-						BaseBranch: depResource.Resolved.BaseBranch,
-						Title:      template.RenderString(depResource.PRTitle, depValues),
-						Body:       buildPRBody(depResource.Name, depValues, "", outputSectionMarkdown(depResource, depValues, repos)),
-						Files:      depFiles,
-					})
-				}).
-				Run()
-
-			if depErr != nil {
-				return nil, fmt.Errorf("creating dependency PR: %w", withAuthHint(depErr, filepath.Base(os.Args[0])))
-			}
-
-			fmt.Println(ui.Success(fmt.Sprintf("%s PR opened: %s", resourceType, hyperlink(depPRURL))))
-			printOutputPath(depResource, depValues, repos)
-			fmt.Println(ui.Warning(fmt.Sprintf("Merge that PR before this %s is ready.", resource.Name)))
-			val = depValues["name"]
 		}
 
 		// Uniqueness check — build a candidate path using current values + this field
@@ -617,37 +514,8 @@ func buildFieldContext(field config.Field, resource config.Resource, repos []*co
 		}
 	}
 
-	if !strings.HasPrefix(field.Source, "resource.") {
-		return &prompt.FieldContext{
-			ListFiles: func(_, _ string) ([]string, error) { return field.Options, nil },
-		}
-	}
-
-	resourceType := strings.TrimPrefix(field.Source, "resource.")
-	depResource, found := remote.FindResource(resourceType, repos)
-	if !found {
-		return nil
-	}
-
-	// Resolved.TargetPath ends in the dependency's own dynamic instance segment (e.g.
-	// "vpc/{{.name}}/") — rendering that against THIS request's values would substitute
-	// {{.name}} with the CURRENT resource's name (e.g. the eks cluster being created),
-	// not list what VPC names already exist. Strip that last segment first so we list
-	// its parent directory (e.g. "vpc/") instead, then render the rest (account/env/
-	// region) against this request's actual answers, same as "dirs:" already does.
-	parentPattern := parentTargetPath(depResource.Resolved.TargetPath)
-	resolvedTargetPath := template.RenderString(parentPattern, values, remote.MapsFor(resource, repos))
-
 	return &prompt.FieldContext{
-		ListFiles: func(_, _ string) ([]string, error) {
-			// Multi-file resources (the norm — anything using template_dir) commit each
-			// instance as a directory (e.g. vpc/{{.name}}/), not a flat file, so listing
-			// existing instances means listing subdirectories, not files.
-			if depResource.Resolved.TemplateDir != "" {
-				return gh.ListDirs(depResource.Resolved.Repo, resolvedTargetPath, "")
-			}
-			return gh.ListFiles(depResource.Resolved.Repo, resolvedTargetPath)
-		},
+		ListFiles: func(_, _ string) ([]string, error) { return field.Options, nil },
 	}
 }
 
@@ -707,45 +575,12 @@ func slugify(s string) string {
 	return strings.Trim(b.String(), "-")
 }
 
-// sharedFieldSeed carries account/environment/region straight through into an
-// inline dependency creation (e.g. picking "[+ create new]" on eks's vpc_name
-// field) so it doesn't re-ask questions the parent request already answered.
-// Only these three are safe to copy blindly — every resource in this repo scopes
-// its target_path by them, but per-instance identity fields like "name" must stay
-// independent (the new vpc's name isn't the eks cluster's name).
-func sharedFieldSeed(dep config.Resource, values map[string]string) map[string]string {
-	seed := make(map[string]string)
-	depFieldNames := make(map[string]bool, len(dep.Fields))
-	for _, f := range dep.Fields {
-		depFieldNames[f.Name] = true
-	}
-	for _, name := range []string{"account", "environment", "region"} {
-		if depFieldNames[name] && values[name] != "" {
-			seed[name] = values[name]
-		}
-	}
-	return seed
-}
-
 // firstFieldName returns the name of the first field defined on the resource.
 func firstFieldName(resource config.Resource) string {
 	if len(resource.Fields) > 0 {
 		return resource.Fields[0].Name
 	}
 	return "name"
-}
-
-// parentTargetPath strips the last path segment off a target_path pattern, e.g.
-// "cloud/aws/{{.account}}/vpc/{{.name}}/" -> "cloud/aws/{{.account}}/vpc/". Used to list
-// what instances of a dependency resource already exist without assuming that trailing
-// segment is literally named "{{.name}}" — it works for whatever the last segment is.
-func parentTargetPath(pattern string) string {
-	trimmed := strings.TrimSuffix(pattern, "/")
-	idx := strings.LastIndex(trimmed, "/")
-	if idx == -1 {
-		return ""
-	}
-	return trimmed[:idx+1]
 }
 
 // resolveSkipIfExists returns the rendered skip_if_exists path for the given source

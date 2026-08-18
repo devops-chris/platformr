@@ -19,7 +19,9 @@ type FieldContext struct {
 }
 
 // PromptField renders an interactive prompt for a single resource field.
-// Returns CreateNewOption if the user chose to create a new dependency resource.
+// Returns CreateNewOption if the user picked "[+ create new]" instead of an
+// existing option — the caller decides what that means (e.g. falling through to
+// a plain text prompt for a "dirs:"-sourced field).
 func PromptField(field config.Field, values map[string]string, ctx *FieldContext) (string, error) {
 	label := field.Label
 	if label == "" {
@@ -111,15 +113,14 @@ func PromptComment() (string, error) {
 	return val, nil
 }
 
-// resolveOptions resolves the options for a select field.
-// For "resource.<type>" sources it calls ctx.ListFiles with the resolved coordinates.
-// For static options it returns field.Options directly.
+// resolveOptions resolves the options for a select field: "dirs:<path>" lists
+// subdirectories, "team:<slug>" lists team members, "collaborators" lists repo
+// collaborators. For static options it returns field.Options directly.
 func resolveOptions(field config.Field, ctx *FieldContext) ([]string, error) {
 	if field.Source == "" {
 		return field.Options, nil
 	}
-	if !strings.HasPrefix(field.Source, "resource.") &&
-		!strings.HasPrefix(field.Source, "dirs:") &&
+	if !strings.HasPrefix(field.Source, "dirs:") &&
 		!strings.HasPrefix(field.Source, "team:") &&
 		field.Source != "collaborators" {
 		return nil, fmt.Errorf("unknown source %q", field.Source)
