@@ -26,6 +26,13 @@ type ResourceDefaults struct {
 	// Takes precedence over template_path when both are set.
 	TemplateDirPath string `toml:"template_dir_path"`
 	BaseBranch      string `toml:"base_branch"`
+	// Fields is a library of reusable field definitions, not fields every resource
+	// automatically gets. A resource opts in by declaring a field with the same
+	// Name and no Type of its own — see resolveFieldLibrary in resolver.go — at
+	// whatever position in its OWN fields list it wants (this is what lets a
+	// resource place e.g. "vertical" after "account", which its source path
+	// depends on). A resource that never mentions the name is unaffected.
+	Fields []Field `toml:"fields"`
 }
 
 type RepoRef struct {
@@ -129,11 +136,14 @@ type TemplateFileConfig struct {
 }
 
 type Field struct {
-	Name         string   `toml:"name"`
-	Type         string   `toml:"type"`  // "input", "select", or "computed"
-	Value        string   `toml:"value"` // Go template expression for computed fields
-	Label        string   `toml:"label"`
-	Source       string   `toml:"source"`       // "dirs:<path>", "files:<path>", "team:<slug>", or "collaborators" — dynamic options
+	Name  string `toml:"name"`
+	Type  string `toml:"type"`  // "input", "select", "computed", "reviewer", "team_reviewer", or "file_lookup"
+	Value string `toml:"value"` // Go template expression for computed fields
+	Label string `toml:"label"`
+	// Source is a dynamic-value directive whose meaning depends on Type:
+	//   select:      "dirs:<path>", "files:<path>", "team:<slug>", or "collaborators"
+	//   file_lookup: a file path in this repo, supports {{.field}} interpolation
+	Source       string   `toml:"source"`
 	AllowManual  bool     `toml:"allow_manual"` // offer "[+ enter manually]" alongside the listed options, or go straight to a text prompt if the list is empty. Doesn't create or validate anything — the typed value is used as-is.
 	Options      []string `toml:"options"`      // static options for select
 	Default      string   `toml:"default"`
@@ -143,4 +153,9 @@ type Field struct {
 	StripPrefix  string   `toml:"strip_prefix"`  // remove this prefix from dynamically sourced option values
 	FilterPrefix string   `toml:"filter_prefix"` // only include options that start with this prefix
 	When         string   `toml:"when"`          // Go template expression — field is skipped when result is not "true"
+	// Pattern is a regex with exactly one capture group, used by type = "file_lookup"
+	// to extract a value out of the file at Source. No prompt is shown; a fetch
+	// failure or non-match is a hard error, since a silently empty/wrong value here
+	// could quietly corrupt anything downstream that references this field.
+	Pattern string `toml:"pattern"`
 }

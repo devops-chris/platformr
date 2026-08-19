@@ -5,8 +5,11 @@ import "strings"
 // Resolve merges org-level and repo-level defaults into each resource's
 // Resolved fields. Call this after loading a RepoConfig.
 func Resolve(orgCfg *OrgConfig, repo *RepoConfig) {
+	fieldLibrary := buildFieldLibrary(orgCfg.Defaults.Fields, repo.Defaults.Fields)
+
 	for i := range repo.Resources {
 		r := &repo.Resources[i]
+		resolveFieldReferences(r.Fields, fieldLibrary)
 
 		// Org: resource override → org default
 		org := coalesce(r.TargetOrg, orgCfg.GitHub.DefaultOrg)
@@ -55,6 +58,38 @@ func Resolve(orgCfg *OrgConfig, repo *RepoConfig) {
 		// same substitution here since these never go through the coalesce above.
 		for j := range r.TemplateFiles {
 			r.TemplateFiles[j].TargetPath = renderPattern(r.TemplateFiles[j].TargetPath, r.Name)
+		}
+	}
+}
+
+// buildFieldLibrary indexes org- and repo-level defaults.fields by Name, for
+// resources to opt into by bare reference. Repo-level wins over org-level on a
+// name collision, same precedence as every other repo-vs-org default.
+func buildFieldLibrary(orgFields, repoFields []Field) map[string]Field {
+	library := make(map[string]Field, len(orgFields)+len(repoFields))
+	for _, f := range orgFields {
+		library[f.Name] = f
+	}
+	for _, f := range repoFields {
+		library[f.Name] = f
+	}
+	return library
+}
+
+// resolveFieldReferences replaces any field with no Type of its own by the
+// matching library entry, in place, at whatever position the resource itself
+// put it — this is what lets a resource decide where in its own field order a
+// shared field (e.g. "vertical") gets evaluated, rather than always running
+// before or after a resource's own fields. A field that already sets Type
+// defines itself fully and is left untouched, even if the name also exists in
+// the library. A bare name with no library match is left as-is too — it just
+// behaves as a plain input field, same as it always has.
+func resolveFieldReferences(fields []Field, library map[string]Field) {
+	for i, f := range fields {
+		if f.Type == "" {
+			if def, ok := library[f.Name]; ok {
+				fields[i] = def
+			}
 		}
 	}
 }

@@ -446,6 +446,7 @@ No configuration required — this prompt appears on all resource types.
 | `input` | Free-text input. Supports `default`, `placeholder`, `validate`, and `optional`. |
 | `select` | Dropdown. Populated from `options` (static) or `source` (dynamic). Supports `optional`, `allow_manual`. |
 | `computed` | No prompt — derives its value from a Go template expression. See [Computed fields](#computed-fields). |
+| `file_lookup` | No prompt — fetches a real file from this repo and extracts a value via regex. See [file_lookup fields](#file_lookup-fields--derive-a-value-from-a-real-file-not-a-duplicate). |
 | `reviewer` / `team_reviewer` | Like `select`, but the chosen value is also added to the PR's reviewers. See [Selectable reviewers](#selectable-reviewers-developer-chosen). |
 
 ### Optional fields
@@ -646,6 +647,93 @@ target_path = "cloud/aws/{{.account}}/use1/{{.cluster}}/"
 Computed fields must appear **after** the fields they reference — `value` can only
 use fields already collected earlier in the list. They respect `when` too, so you
 can conditionally skip a computed field just like any other.
+
+---
+
+### `file_lookup` fields — derive a value from a real file, not a duplicate
+
+`computed` fields are great when the value is a function of answers the developer
+already gave. Sometimes the value you actually want lives in a *file* elsewhere in
+the repo — an account's vertical/brand, a cluster's real environment name, anything
+already declared as a `locals` value in some `.hcl` file that this repo's own
+Terragrunt units read directly. Hand-maintaining a second copy of that value inside
+`platformr.toml` (a lookup table, a map) works, but it's a duplicate that can drift
+from the real file whenever someone updates one and not the other.
+
+`type = "file_lookup"` fetches the real file and extracts the value with a regex —
+no prompt, no duplicated data, and it can never go stale since it's reading the
+actual source of truth:
+
+```toml
+[[resources.fields]]
+name    = "vertical"
+type    = "file_lookup"
+source  = "cloud/aws/{{.account}}/account.hcl"   # supports {{.field}}, same as any path
+pattern = '(?m)^\s*vertical\s*=\s*"([^"]*)"'      # exactly one capture group
+```
+
+`source` is fetched from this repo (at the same ref templates are read from) and
+rendered against already-collected field values first, so it must appear **after**
+whatever fields it references — same ordering rule as `computed`. `pattern` needs
+exactly one capture group; its match becomes the field's value, available afterward
+as `{{.vertical}}` anywhere a field value normally works: `output_path`, `pr_title`,
+`when` conditions, and inside `.tmpl` files.
+
+A fetch failure, a pattern with no match, or a pattern with no capture group are all
+**hard errors** that stop the request — `file_lookup` is usually feeding something
+downstream (a path, a template) where a silently empty or wrong value would be worse
+than the request just failing loudly.
+
+---
+
+### Reusable fields — `[defaults.fields]`
+
+Some fields are identical across every resource — `account`, or a `file_lookup` like
+`vertical` above that every resource in the repo would want the same way. Repeating
+the exact same `[[resources.fields]]` block in every resource is real duplication,
+and it's easy to let a copy drift once you're editing five of them.
+
+Define the field **once**, under `[defaults]` (repo-level, or org-level in
+`.platformr/config.toml` if it should apply across every connected repo), and any
+resource opts in by declaring a field with the **same name and no `type` of its
+own** — platformr fills in the rest of the definition from the default:
+
+```toml
+[defaults]
+  [[defaults.fields]]
+  name    = "vertical"
+  type    = "file_lookup"
+  source  = "cloud/aws/{{.account}}/account.hcl"
+  pattern = '(?m)^\s*vertical\s*=\s*"([^"]*)"'
+
+[[resources]]
+name = "eks"
+
+  [[resources.fields]]
+  name   = "account"
+  type   = "select"
+  source = "dirs:cloud/aws"
+
+  [[resources.fields]]
+  name = "vertical"   # bare reference — pulls type/source/pattern from defaults above
+```
+
+A few things worth being deliberate about:
+
+- **This isn't limited to `file_lookup`.** Any field type can live in
+  `[defaults.fields]` — a `select` sourced from `dirs:`, a `computed` field,
+  anything. The reuse mechanism is the same regardless of what kind of field it is.
+- **A resource controls where in its own list the reference sits.** Since `vertical`
+  needs `{{.account}}` already known, it has to come after `account` in the
+  resource's own `fields` — same ordering discipline as everywhere else. Nothing
+  forces a default field to run before or after a resource's own fields; the
+  resource decides by where it places the bare reference.
+- **Opting in is required, not automatic.** A resource that never mentions
+  `vertical` is completely unaffected — this is a library to draw from, not
+  something injected into every resource whether it's wanted or not.
+- **A resource can still fully override it.** Give the field a `type` of its own
+  and platformr uses that instead of the default — the name match only fires when
+  the resource's own field is bare (no `type` set).
 
 ---
 

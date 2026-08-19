@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/huh"
@@ -437,6 +438,19 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 			continue
 		}
 
+		// file_lookup fields fetch a real file from this repo and extract a value
+		// via regex — no prompt. A fetch failure or non-match is a hard error rather
+		// than an empty/wrong value, since this typically feeds paths or templates
+		// downstream that would otherwise be silently corrupted.
+		if field.Type == "file_lookup" {
+			val, err := resolveFileLookup(field, resource, repos, gh, values)
+			if err != nil {
+				return nil, err
+			}
+			values[field.Name] = val
+			continue
+		}
+
 		ctx := buildFieldContext(field, resource, repos, gh, values)
 
 		val, err := prompt.PromptField(field, values, ctx)
@@ -592,6 +606,35 @@ func firstFieldName(resource config.Resource) string {
 		return resource.Fields[0].Name
 	}
 	return "name"
+}
+
+// resolveFileLookup fetches the file at field.Source (rendered against already-
+// collected values, e.g. "cloud/aws/{{.account}}/account.hcl") from this resource's
+// own repo/ref, and returns the first capture group of field.Pattern matched
+// against its content. Fetch failure, no match, or a pattern with no capture
+// group are all hard errors — this typically feeds paths or templates downstream,
+// so a silent empty/wrong value would be worse than stopping the request here.
+func resolveFileLookup(field config.Field, resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, values map[string]string) (string, error) {
+	path := template.RenderString(field.Source, values, remote.MapsFor(resource, repos))
+
+	re, err := regexp.Compile(field.Pattern)
+	if err != nil {
+		return "", fmt.Errorf("field %q: invalid pattern %q: %w", field.Name, field.Pattern, err)
+	}
+	if re.NumSubexp() < 1 {
+		return "", fmt.Errorf("field %q: pattern %q has no capture group", field.Name, field.Pattern)
+	}
+
+	content, err := gh.FetchFile(resource.Resolved.TemplateRepo, path, resource.Resolved.TemplateRef)
+	if err != nil {
+		return "", fmt.Errorf("field %q: fetching %s: %w", field.Name, path, err)
+	}
+
+	match := re.FindStringSubmatch(content)
+	if match == nil {
+		return "", fmt.Errorf("field %q: pattern %q did not match anything in %s", field.Name, field.Pattern, path)
+	}
+	return match[1], nil
 }
 
 // resolveSkipIfExists returns the rendered skip_if_exists path for the given source
