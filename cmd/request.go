@@ -250,7 +250,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 				Branch:        fmt.Sprintf("platformr/%s-%s", resource.Name, resolveSlug(resource, values)),
 				BaseBranch:    resource.Resolved.BaseBranch,
 				Title:         template.RenderString(resource.PRTitle, values, remote.MapsFor(resource, repos)),
-				Body:          buildPRBody(resource.Name, values, comment, outputSectionMarkdown(resource, values, repos)),
+				Body:          buildPRBody(resource.Name, values, comment, template.RenderString(resource.Instructions, values, remote.MapsFor(resource, repos)), outputSectionMarkdown(resource, values, repos)),
 				Files:         prFiles,
 				Reviewers:     reviewers,
 				TeamReviewers: teamReviewers,
@@ -718,13 +718,21 @@ func printDryRun(resource config.Resource, values map[string]string, files []ghc
 	fmt.Println()
 }
 
-func buildPRBody(resourceName string, values map[string]string, comment string, outputSection string) string {
-	body := fmt.Sprintf("## %s request\n\nOpened via `%s`\n\n### Details\n\n", resourceName, filepath.Base(os.Args[0]))
-	for k, v := range values {
-		body += fmt.Sprintf("- **%s**: %s\n", k, v)
-	}
+// buildPRBody orders sections most-important-first for whoever reads the PR:
+// the requestor's own context, then what to actually do about this PR, then the
+// raw field dump (reference material, not usually the first thing anyone needs),
+// then outputs (only relevant once it's actually applied/reconciled/whatever).
+func buildPRBody(resourceName string, values map[string]string, comment string, instructions string, outputSection string) string {
+	body := fmt.Sprintf("## %s request\n\nOpened via `%s`\n", resourceName, filepath.Base(os.Args[0]))
 	if comment != "" {
 		body += fmt.Sprintf("\n### Notes\n\n%s\n", comment)
+	}
+	if instructions != "" {
+		body += fmt.Sprintf("\n### Instructions\n\n%s\n", instructions)
+	}
+	body += "\n### Details\n\n"
+	for k, v := range values {
+		body += fmt.Sprintf("- **%s**: %s\n", k, v)
 	}
 	body += outputSection
 	return body

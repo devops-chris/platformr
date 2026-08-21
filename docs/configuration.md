@@ -323,6 +323,28 @@ change later, once something (`lockr` or otherwise) actually supports more
 than AWS. Shown alongside the outputs in `platformr status`. Ignored if
 `output_path` isn't set.
 
+### `instructions` — anything whoever handles this next should know
+
+Free text, shown in its own section of the PR body, right after the requestor's
+own notes and before the raw field dump. Deliberately mechanism-agnostic —
+platformr doesn't know or care whether "handling this" means running a specific
+`terragrunt`/`terraform` command, waiting on a GitOps controller to reconcile,
+getting a manual approval somewhere, or nothing at all:
+
+```toml
+[[resources]]
+name = "vpc"
+instructions = '''
+Run `terragrunt run-all apply` from this unit's directory — it includes the
+nested eip/ and twingate/ units and applies everything in the correct order
+automatically.
+'''
+```
+
+Supports `{{.field}}` interpolation like `output_path`. Absent means no
+section is shown — most resources probably don't need one; it's for the cases
+where "just merge it" isn't actually the whole story.
+
 ---
 
 ## Resource display names
@@ -433,7 +455,10 @@ PR body under a **Notes** heading:
 needs to land before the RDS migration on Friday
 ```
 
-No configuration required — this prompt appears on all resource types.
+No configuration required — this prompt appears on all resource types. It's the
+first section in the PR body (right after the heading) — ahead of `instructions`
+and the raw field dump — since it's whatever context the requestor thought was
+worth flagging, which is usually the most useful thing to read first.
 
 ---
 

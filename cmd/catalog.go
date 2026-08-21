@@ -199,6 +199,9 @@ func printSchemaHuman(r *config.Resource) error {
 		}
 		fmt.Printf("  %s %s\n", labelStyle.Render("Outputs:"), outputs)
 	}
+	if r.Instructions != "" {
+		fmt.Printf("  %s %s\n", labelStyle.Render("Instructions:"), ui.Subtle("configured — shown in the PR body"))
+	}
 	fmt.Println()
 
 	if len(r.Fields) == 0 {
@@ -285,15 +288,16 @@ type catalogFieldJSON struct {
 }
 
 type catalogResourceJSON struct {
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
-	Target      string             `json:"target"`
-	Template    string             `json:"template"`
-	BaseBranch  string             `json:"base_branch"`
-	OutputPath  string             `json:"output_path,omitempty"`
-	OutputKeys  []string           `json:"output_keys,omitempty"`
-	OutputCloud string             `json:"output_cloud,omitempty"`
-	Fields      []catalogFieldJSON `json:"fields"`
+	Name         string             `json:"name"`
+	Description  string             `json:"description"`
+	Target       string             `json:"target"`
+	Template     string             `json:"template"`
+	BaseBranch   string             `json:"base_branch"`
+	OutputPath   string             `json:"output_path,omitempty"`
+	OutputKeys   []string           `json:"output_keys,omitempty"`
+	OutputCloud  string             `json:"output_cloud,omitempty"`
+	Instructions string             `json:"instructions,omitempty"`
+	Fields       []catalogFieldJSON `json:"fields"`
 }
 
 func toSchemaJSON(r *config.Resource) catalogResourceJSON {
@@ -312,15 +316,16 @@ func toSchemaJSON(r *config.Resource) catalogResourceJSON {
 		}
 	}
 	return catalogResourceJSON{
-		Name:        r.Name,
-		Description: r.Description,
-		Target:      r.Resolved.Repo + "/" + r.Resolved.TargetPath,
-		Template:    r.Resolved.TemplateRepo + "/" + r.Resolved.Template,
-		BaseBranch:  r.Resolved.BaseBranch,
-		OutputPath:  r.OutputPath,
-		OutputKeys:  r.OutputKeys,
-		OutputCloud: r.OutputCloud,
-		Fields:      fields,
+		Name:         r.Name,
+		Description:  r.Description,
+		Target:       r.Resolved.Repo + "/" + r.Resolved.TargetPath,
+		Template:     r.Resolved.TemplateRepo + "/" + r.Resolved.Template,
+		BaseBranch:   r.Resolved.BaseBranch,
+		OutputPath:   r.OutputPath,
+		OutputKeys:   r.OutputKeys,
+		OutputCloud:  r.OutputCloud,
+		Instructions: r.Instructions,
+		Fields:       fields,
 	}
 }
 

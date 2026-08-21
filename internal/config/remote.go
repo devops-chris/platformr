@@ -95,6 +95,13 @@ type Resource struct {
 	// whatever fetches values) actually supports more than AWS. Ignored if
 	// OutputPath is unset.
 	OutputCloud string `toml:"output_cloud"`
+	// Instructions is free-text shown in its own section of the PR body — anything
+	// the platform team wants whoever handles this next to know. Deliberately
+	// mechanism-agnostic: platformr doesn't know or care whether that means running
+	// a specific terragrunt/terraform command, waiting on a GitOps controller to
+	// reconcile, getting a manual approval somewhere, or nothing at all. Supports
+	// {{.field}} interpolation like OutputPath. Absent means no section is shown.
+	Instructions string `toml:"instructions"`
 	// Resolved is populated by the resolver after loading. Do not set in TOML.
 	Resolved ResolvedResource `toml:"-"`
 }
