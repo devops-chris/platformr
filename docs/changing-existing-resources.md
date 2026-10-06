@@ -20,7 +20,7 @@ This request changes:
 ```
 
 Four complete, tested examples (Helm, Terraform, a security group, an IAM policy)
-are in [`examples/changeable/`](../examples/changeable/). The settings themselves
+are in [`examples/changeable/`](https://github.com/devops-chris/platformr/tree/main/examples/changeable/). The settings themselves
 are listed in [configuration.md](configuration.md#change-requests-editing-existing-files).
 
 ---

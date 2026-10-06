@@ -1,0 +1,40 @@
+site_name: platformr
+site_description: Self-service infrastructure requests that arrive as pull requests.
+site_url: https://devops-chris.github.io/platformr/
+repo_url: https://github.com/devops-chris/platformr
+repo_name: devops-chris/platformr
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Changing existing resources: changing-existing-resources.md
+  - Configuration reference: configuration.md
+  - Shell completion: completion.md

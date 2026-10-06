@@ -407,7 +407,7 @@ A request with `update_file`, a question with `key` or `list`, or any
 `[[resources.changes]]` is a **change request**: it changes values inside an
 existing file instead of rendering templates into new ones. The step-by-step
 guide is [changing-existing-resources.md](changing-existing-resources.md);
-four tested examples are in [`examples/changeable/`](../examples/changeable/).
+four tested examples are in [`examples/changeable/`](https://github.com/devops-chris/platformr/tree/main/examples/changeable/).
 
 ```toml
 [[resources]]

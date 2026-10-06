@@ -2,6 +2,8 @@
 
 **Self-service infrastructure requests that arrive as pull requests.**
 
+📖 **Docs:** https://devops-chris.github.io/platformr/
+
 A developer answers a few questions in the terminal. platformr turns the answers
 into files in your infrastructure repo and opens a pull request. Your platform
 team reviews it and applies it the same way they handle any other change.
