@@ -1,0 +1,30 @@
+Statement[Sid="S3Read"].Action: + s3:PutObject
+Statement[Sid="S3Read"].Resource: + arn:aws:s3:::exports
+Statement[Sid="S3Read"].Action: − s3:ListBucket
+MaxSessionSeconds: 3600 → 7200
+Tags: + owner = platform
+Statement: + {Action=kms:Decrypt, Effect=Allow, Resource=*, Sid=KMS}
+Statement: − {Sid=Logs}
+----- policy.json -----
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "S3Read",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": ["arn:aws:s3:::reports", "arn:aws:s3:::reports/*", "arn:aws:s3:::exports"]
+    },
+    {
+      "Sid": "KMS",
+      "Effect": "Allow",
+      "Action": "kms:Decrypt",
+      "Resource": "*"
+    }
+  ],
+  "Tags": {"team": "data", "owner": "platform"},
+  "MaxSessionSeconds": 7200
+}

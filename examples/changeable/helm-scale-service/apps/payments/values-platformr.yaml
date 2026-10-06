@@ -1,5 +1,0 @@
-# Owned by platformr. Change it with a platformr request, not by hand.
-replicaCount: 2
-resources:
-  requests:
-    cpu: "500m"

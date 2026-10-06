@@ -181,6 +181,18 @@ func runDoctor(_ *cobra.Command, _ []string) error {
 		}
 	}
 
+	// Change requests whose config can't work.
+	for _, repo := range repos {
+		for _, r := range repo.Resources {
+			if !r.IsUpdate() {
+				continue
+			}
+			for _, e := range checkUpdateConfig(r) {
+				warn(fmt.Sprintf("%s: request %q", repo.RepoName, r.Name), e.Error())
+			}
+		}
+	}
+
 	// Problems that hid some requests without failing the whole repo.
 	for _, w := range loader.Warnings {
 		title, hint, _ := strings.Cut(w, "\n")

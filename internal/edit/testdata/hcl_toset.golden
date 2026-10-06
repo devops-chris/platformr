@@ -1,0 +1,9 @@
+locals.pt_shared_prod_accounts: + pt-shared-prod-ai
+----- accounts.tf -----
+locals {
+  pt_shared_prod_accounts = toset([
+    "pt-shared-prod-infra",
+    "pt-shared-prod-services",
+    "pt-shared-prod-ai",
+  ])
+}

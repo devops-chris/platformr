@@ -1,0 +1,10 @@
+users: + {name=lee, role=read-only}
+users: − {name=jane}
+teams: + data = read-only
+teams: − platform
+users: − {name=raj}
+users: − {name=lee}
+----- access.yaml -----
+users: []
+teams:
+  data: read-only

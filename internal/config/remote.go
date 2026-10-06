@@ -107,6 +107,17 @@ type Resource struct {
 	// reconcile, getting a manual approval somewhere, or nothing at all. Supports
 	// {{.field}} interpolation like OutputPath. Absent means no section is shown.
 	Instructions string `toml:"instructions"`
+	// UpdateFile makes this a change request: instead of rendering templates into new
+	// files, it changes values inside this existing file (supports {{.field}}). Fields
+	// with a `key` read their current value from it and write the answer back; Changes
+	// add or remove items in lists and maps. See docs/changing-existing-resources.md.
+	UpdateFile string `toml:"update_file"`
+	// Format overrides how UpdateFile is read when its extension doesn't say:
+	// yaml, json, hcl, env or marker.
+	Format string `toml:"format"`
+	// Changes are collection edits (append / remove / put / delete) and file deletions
+	// made by a change request, in order, after the questions are answered.
+	Changes []ChangeConfig `toml:"changes"`
 	// Resolved is populated by the resolver after loading. Do not set in TOML.
 	Resolved ResolvedResource `toml:"-"`
 }
@@ -170,4 +181,61 @@ type Field struct {
 	// failure or non-match is a hard error, since a silently empty/wrong value here
 	// could quietly corrupt anything downstream that references this field.
 	Pattern string `toml:"pattern"`
+	// Key points at a value in the request's update_file (or this field's own
+	// update_file): the question starts on the current value there, and the answer is
+	// written back to the same spot. A string is a dotted path ("resources.requests.cpu");
+	// a list keeps each step whole and allows matches: ["Statement", {Sid = "S3Read"}, "Action"].
+	// "marker:<name>" points at a line tagged with a platformr:<name> comment instead.
+	Key any `toml:"key"`
+	// UpdateFile / Format override the request's update_file for this one field.
+	UpdateFile string `toml:"update_file"`
+	Format     string `toml:"format"`
+	// List fills a select with the items of a list or map in the update_file (same
+	// path syntax as Key), e.g. the users that exist, for a "remove user" request.
+	// Show names the field to display when the items are objects.
+	List any    `toml:"list"`
+	Show string `toml:"show"`
+}
+
+// ChangeConfig is one [[resources.changes]] entry. Every string supports {{.field}}.
+type ChangeConfig struct {
+	// Action: append (add to a list), remove (take matching items out of a list),
+	// put (add a named entry to a map), delete (remove a named entry from a map),
+	// set (change one value), or delete_file (remove a whole file, for
+	// one-file-per-item collections).
+	Action string `toml:"action"`
+	Key    any    `toml:"key"`
+	// Item is what append/put adds: a plain value ("{{.cidr}}") or an object
+	// ({ name = "{{.username}}", role = "{{.role}}" }).
+	Item any `toml:"item"`
+	// Name is the map entry for put/delete.
+	Name string `toml:"name"`
+	// Value is the new value for set.
+	Value string `toml:"value"`
+	// Match picks what remove takes out: a plain value ("{{.cidr}}") or the fields an
+	// object must have ({ name = "{{.username}}" }).
+	Match any `toml:"match"`
+	// UniqueBy stops an append if an item with the same value already exists: a field
+	// name for objects, or "value" for plain lists.
+	UniqueBy string `toml:"unique_by"`
+	// File / Format override the request's update_file for this change. For
+	// delete_file, File is the file to delete.
+	File   string `toml:"file"`
+	Format string `toml:"format"`
+	// When skips this change unless it renders to "true", like a field's when.
+	When string `toml:"when"`
+}
+
+// IsUpdate reports whether this is a change request (edits existing files) rather
+// than a create request (renders templates into new files).
+func (r Resource) IsUpdate() bool {
+	if r.UpdateFile != "" || len(r.Changes) > 0 {
+		return true
+	}
+	for _, f := range r.Fields {
+		if f.Key != nil || f.List != nil {
+			return true
+		}
+	}
+	return false
 }

@@ -2,10 +2,10 @@
 image:
   repository: ghcr.io/acme/payments
   tag: "1.4.0"
-replicaCount: 2  # bump for peak season
+replicaCount: 4  # bump for peak season
 resources:
   requests:
-    cpu: 500m
+    cpu: "1"
     memory: 512Mi
 env:
   - name: LOG_LEVEL

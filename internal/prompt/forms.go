@@ -61,7 +61,8 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 		options = append(options, ManualEntryOption)
 	}
 
-	var val string
+	// Start on the default (for change requests, the current value) when it's listed.
+	val := field.Default
 	sel := huh.NewSelect[string]().
 		Title(label).
 		Options(toHuhOptions(options)...).

@@ -3,7 +3,7 @@ module "eks" {
   version = "~> 20.0"
 
   cluster_name    = "apps"
-  cluster_version = "1.32"
+  cluster_version = "1.33"
 
   eks_managed_node_groups = {
     default = {

@@ -1,43 +1,10 @@
-# Two requests, both in the "EKS" group of the picker.
-
-# 1. New cluster: renders every template in platformr/templates/eks/.
-[[resources]]
-name         = "eks"
-category     = "EKS"
-display_name = "New cluster"
-template_dir = "platformr/templates/eks"
-target_path  = "clusters/{{.name}}/"
-pr_title     = "feat(eks): add {{.name}} cluster"
-
-  [[resources.fields]]
-  name  = "name"
-  type  = "input"
-  label = "Cluster name"
-
-  [[resources.fields]]
-  name    = "cluster_version"
-  type    = "select"
-  label   = "Kubernetes version"
-  options = ["1.32", "1.33", "1.34"]
-
-  [[resources.fields]]
-  name    = "node_count"
-  type    = "select"
-  label   = "How many nodes?"
-  options = ["2", "3", "5"]
-
-# 2. Upgrade cluster version: rewrites ONLY instance.auto.tfvars, and asks ONLY for the
-#    version. node_count isn't asked, so it keeps the value it already has.
+# "EKS › Upgrade cluster version": change one value inside main.tf's module block.
 [[resources]]
 name         = "eks-upgrade"
 category     = "EKS"
 display_name = "Upgrade cluster version"
-mode         = "update"                                              # proposed
-template     = "platformr/templates/eks/instance.auto.tfvars.tmpl"
-target_path  = "clusters/{{.name}}/"
-file_name    = "instance"
-file_ext     = ".auto.tfvars"
-pr_title     = "chore(eks): upgrade {{.name}} to {{.cluster_version}}"
+update_file  = 'clusters/{{.name}}/main.tf'
+pr_title     = 'chore(eks): upgrade {{.name}} to {{.cluster_version}}'
 
   [[resources.fields]]
   name   = "name"
@@ -49,4 +16,5 @@ pr_title     = "chore(eks): upgrade {{.name}} to {{.cluster_version}}"
   name    = "cluster_version"
   type    = "select"
   label   = "Kubernetes version (one step at a time, e.g. 1.32 → 1.33)"
-  options = ["1.32", "1.33", "1.34"]
+  options = ["1.33", "1.34"]             # approved versions; the current one is always offered too
+  key     = "module.eks.cluster_version" # block type, block name, attribute

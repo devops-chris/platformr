@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -104,10 +105,27 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Change requests edit existing files instead of rendering templates.
+	var sess *updateSession
+	if resource.IsUpdate() {
+		if errs := checkUpdateConfig(resource); len(errs) > 0 {
+			msg := fmt.Sprintf("The %q request is set up wrong, so it can't run. Ask the platform team to fix platformr.toml:", resource.Name)
+			for _, e := range errs {
+				msg += "\n  - " + e.Error()
+			}
+			return errors.New(msg)
+		}
+		sess = newUpdateSession(gh, resource, remote.MapsFor(resource, repos))
+	}
+
 	// Collect field values
-	values, err := collectFields(resource, repos, gh)
+	values, err := collectFields(resource, repos, gh, sess)
 	if err != nil {
 		return err
+	}
+
+	if sess != nil {
+		return runUpdate(resource, repos, values, sess, ghWrite, gh, binaryName)
 	}
 
 	// Prompt for optional PR comment
@@ -423,7 +441,7 @@ func pickFromList(title, description string, resources []config.Resource) (confi
 	return config.Resource{}, fmt.Errorf("resource %q not found", selected)
 }
 
-func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client) (map[string]string, error) {
+func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, sess *updateSession) (map[string]string, error) {
 	values := make(map[string]string)
 
 	for _, field := range resource.Fields {
@@ -452,6 +470,20 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 			continue
 		}
 
+		// default and placeholder can use earlier answers: default = "{{.current_version}}".
+		field.Default = template.RenderString(field.Default, values, remote.MapsFor(resource, repos))
+		field.Placeholder = template.RenderString(field.Placeholder, values, remote.MapsFor(resource, repos))
+
+		// Change requests: start key questions on the value in the file, and fill
+		// list questions with what's there.
+		if sess != nil && (field.Key != nil || field.List != nil) {
+			prepared, err := sess.prepareField(field, resource, values)
+			if err != nil {
+				return nil, err
+			}
+			field = prepared
+		}
+
 		ctx := buildFieldContext(field, resource, repos, gh, values)
 
 		val, err := prompt.PromptField(field, values, ctx)
@@ -475,6 +507,10 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 			candidateValues := copyMap(values)
 			candidateValues[field.Name] = val
 			candidatePath := resolveFilePath(resource, candidateValues)
+			if resource.Resolved.TemplateDir != "" && resource.FileName == "" {
+				// One folder per instance: the folder itself is what must not exist yet.
+				candidatePath = strings.TrimSuffix(template.RenderString(resource.Resolved.TargetPath, candidateValues), "/")
+			}
 			var exists bool
 			_ = spinner.New().
 				Title(fmt.Sprintf("Checking if %q already exists...", val)).

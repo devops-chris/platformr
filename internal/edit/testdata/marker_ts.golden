@@ -1,0 +1,8 @@
+marker:cluster_version: 1.32 → 1.33
+marker:node_count: 3 → 5
+----- index.ts -----
+const cluster = new eks.Cluster(this, "apps", {
+  version: "1.33", // platformr:cluster_version
+  nodeCount: 5, // platformr:node_count
+  nodeCountMax: 6, // platformr:node_count_max
+});

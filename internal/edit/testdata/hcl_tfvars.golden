@@ -1,0 +1,4 @@
+cluster_version: 1.32 → 1.33
+----- terraform.tfvars -----
+cluster_version = "1.33"
+node_count      = 3

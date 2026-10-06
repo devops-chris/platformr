@@ -1,0 +1,5 @@
+marker:sku: P1v3 → P2v3
+marker:zr: false → true
+----- main.bicepparam -----
+param skuName = 'P2v3' // platformr:sku
+param zoneRedundant = true // platformr:zr

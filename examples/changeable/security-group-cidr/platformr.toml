@@ -1,0 +1,38 @@
+# "Network › Allow an IP" and "Network › Remove an IP": add or take out one CIDR in a
+# security group rule's list.
+[[resources]]
+name         = "sg-allow-ip"
+category     = "Network"
+display_name = "Allow an IP"
+update_file  = "network/security-groups.tf"
+pr_title     = 'feat(network): allow {{.cidr}} on HTTPS'
+
+  [[resources.fields]]
+  name        = "cidr"
+  type        = "input"
+  label       = "IP range to allow (CIDR, e.g. 203.0.113.10/32)"
+  placeholder = "203.0.113.10/32"
+
+  [[resources.changes]]
+  action    = "append"
+  key       = "resource.aws_security_group_rule.https.cidr_blocks"
+  item      = "{{.cidr}}"
+  unique_by = "value"                    # stops if that CIDR is already there
+
+[[resources]]
+name         = "sg-remove-ip"
+category     = "Network"
+display_name = "Remove an IP"
+update_file  = "network/security-groups.tf"
+pr_title     = 'chore(network): remove {{.cidr}} from HTTPS'
+
+  [[resources.fields]]
+  name  = "cidr"
+  type  = "select"
+  label = "Which IP range?"
+  list  = "resource.aws_security_group_rule.https.cidr_blocks"   # offers what's in the list now
+
+  [[resources.changes]]
+  action = "remove"
+  key    = "resource.aws_security_group_rule.https.cidr_blocks"
+  match  = "{{.cidr}}"

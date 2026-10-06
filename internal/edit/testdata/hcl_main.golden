@@ -1,0 +1,68 @@
+locals.cluster_version: 1.32 → 1.33
+locals.node_count: 3 → 5
+locals.allowed_cidrs: + 198.51.100.7/32
+locals.allowed_cidrs: − 10.0.0.0/8
+locals.access_entries: + raj = {access_level=read-only, principal_arn=arn:aws:iam::123456789012:role/raj}
+locals.access_entries: − jane
+locals.tags: + owner = devops
+resource.aws_security_group_rule.https.cidr_blocks: + 172.16.0.0/12
+resource.aws_security_group_rule.https.from_port: 443 → 8443
+resource.aws_iam_policy.reports.policy.Statement[Sid="S3Read"].Action: + s3:PutObject
+data.aws_iam_policy_document.ci.statement[sid="ECRPush"].actions: + ecr:UploadLayerPart
+----- main.tf -----
+locals {
+  cluster_version = "1.33"
+  node_count      = 5
+  allowed_cidrs = [
+    "203.0.113.10/32",
+    "198.51.100.7/32",
+  ]
+  access_entries = {
+    raj = {
+      principal_arn = "arn:aws:iam::123456789012:role/raj"
+      access_level  = "read-only"
+    }
+  }
+  tags = { team = "platform", owner = "devops" }
+}
+
+module "eks" {
+  source          = "terraform-aws-modules/eks/aws"
+  cluster_version = local.cluster_version
+}
+
+resource "aws_security_group_rule" "https" {
+  type        = "ingress"
+  from_port   = 8443
+  to_port     = 443
+  protocol    = "tcp"
+  cidr_blocks = ["10.0.0.0/8", "172.16.0.0/12"]
+}
+
+resource "aws_iam_policy" "reports" {
+  name = "reports"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "S3Read"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject"]
+        Resource = "*"
+      },
+    ]
+  })
+}
+
+data "aws_iam_policy_document" "ci" {
+  statement {
+    sid       = "ECRPush"
+    actions   = ["ecr:PutImage", "ecr:UploadLayerPart"]
+    resources = ["*"]
+  }
+  statement {
+    sid       = "Logs"
+    actions   = ["logs:PutLogEvents"]
+    resources = ["*"]
+  }
+}

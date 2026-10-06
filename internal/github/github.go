@@ -28,6 +28,38 @@ func IsUnauthorized(err error) bool {
 	return false
 }
 
+// BranchExists reports whether a branch already exists in repo.
+func (c *Client) BranchExists(repo, branch string) (bool, error) {
+	owner, repoName, err := parseRepo(repo)
+	if err != nil {
+		return false, err
+	}
+	_, _, err = c.client.Git.GetRef(context.Background(), owner, repoName, "refs/heads/"+branch)
+	if err != nil {
+		if isNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// OpenPRForBranch returns the URL of an open pull request whose head is branch.
+func (c *Client) OpenPRForBranch(repo, branch string) (string, bool, error) {
+	owner, repoName, err := parseRepo(repo)
+	if err != nil {
+		return "", false, err
+	}
+	prs, _, err := c.client.PullRequests.List(context.Background(), owner, repoName, &gh.PullRequestListOptions{
+		State: "open",
+		Head:  owner + ":" + branch,
+	})
+	if err != nil || len(prs) == 0 {
+		return "", false, err
+	}
+	return prs[0].GetHTMLURL(), true, nil
+}
+
 // IsNotFound reports whether err (or anything it wraps) is a GitHub API 404.
 func IsNotFound(err error) bool { return isNotFound(err) }
 
@@ -68,6 +100,7 @@ func New(token string) *Client {
 type PRFile struct {
 	Path    string
 	Content string
+	Delete  bool // remove this file in the commit instead of writing it
 }
 
 // TemplateFile is a raw template fetched from a template directory.
@@ -474,10 +507,13 @@ func (c *Client) createMultiFilePR(ctx context.Context, owner, repo, baseBranch 
 	entries := make([]*gh.TreeEntry, len(req.Files))
 	for i, f := range req.Files {
 		entries[i] = &gh.TreeEntry{
-			Path:    gh.String(f.Path),
-			Mode:    gh.String("100644"),
-			Type:    gh.String("blob"),
-			Content: gh.String(f.Content),
+			Path: gh.String(f.Path),
+			Mode: gh.String("100644"),
+			Type: gh.String("blob"),
+		}
+		if !f.Delete {
+			// No content and no SHA tells GitHub to delete the file.
+			entries[i].Content = gh.String(f.Content)
 		}
 	}
 

@@ -1,0 +1,32 @@
+# "IAM › Add a permission": add one action to the statement with a given Sid.
+[[resources]]
+name         = "iam-add-action"
+category     = "IAM"
+display_name = "Add a permission"
+update_file  = 'policies/{{.policy}}.json'
+pr_title     = 'feat(iam): allow {{.action}} in {{.policy}}'
+
+  [[resources.fields]]
+  name   = "policy"
+  type   = "select"
+  label  = "Which policy?"
+  source = "files:policies"              # policies/*.json, without the extension
+
+  [[resources.fields]]
+  name    = "sid"
+  type    = "select"
+  label   = "Which statement?"
+  list    = "Statement"
+  show    = "Sid"                        # statements are objects; list them by Sid
+
+  [[resources.fields]]
+  name    = "action"
+  type    = "select"
+  label   = "Permission to add"
+  options = ["s3:PutObject", "s3:DeleteObject", "s3:GetObjectTagging"]
+
+  [[resources.changes]]
+  action    = "append"
+  key       = ["Statement", { Sid = "{{.sid}}" }, "Action"]   # the Action list of that statement
+  item      = "{{.action}}"
+  unique_by = "value"
