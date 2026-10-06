@@ -1,0 +1,23 @@
+# Yours to edit by hand after the cluster is created.
+# Terraform loads instance.auto.tfvars automatically: no wiring needed.
+variable "cluster_version" {
+  type = string
+}
+
+variable "node_count" {
+  type = number
+}
+
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 20.0"
+
+  cluster_name    = "{{.name}}"
+  cluster_version = var.cluster_version
+
+  eks_managed_node_groups = {
+    default = {
+      desired_size = var.node_count
+    }
+  }
+}

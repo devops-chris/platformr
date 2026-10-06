@@ -1,0 +1,52 @@
+# Two requests, both in the "Service" group of the picker.
+
+# 1. New service: renders every template in platformr/templates/service/.
+[[resources]]
+name         = "service"
+category     = "Service"
+display_name = "New service"
+template_dir = "platformr/templates/service"
+target_path  = "apps/{{.name}}/"
+pr_title     = "feat(service): add {{.name}}"
+
+  [[resources.fields]]
+  name  = "name"
+  type  = "input"
+  label = "Service name"
+
+  [[resources.fields]]
+  name    = "replicas"
+  type    = "select"
+  label   = "How many copies (replicas)?"
+  options = ["1", "2", "3", "4", "6"]
+
+  [[resources.fields]]
+  name    = "cpu"
+  type    = "select"
+  label   = "CPU per copy"
+  options = ["250m", "500m", "1"]
+
+# 2. Scale service: rewrites ONLY values-platformr.yaml, and asks ONLY for replicas.
+#    cpu isn't asked, so it keeps the value it already has.
+[[resources]]
+name         = "service-scale"
+category     = "Service"
+display_name = "Scale service"
+mode         = "update"                                              # proposed
+template     = "platformr/templates/service/values-platformr.yaml.tmpl"
+target_path  = "apps/{{.name}}/"
+file_name    = "values-platformr"
+file_ext     = ".yaml"
+pr_title     = "chore(service): scale {{.name}} to {{.replicas}} replicas"
+
+  [[resources.fields]]
+  name   = "name"
+  type   = "select"
+  label  = "Which service?"
+  source = "dirs:apps"
+
+  [[resources.fields]]
+  name    = "replicas"
+  type    = "select"
+  label   = "How many copies (replicas)?"
+  options = ["1", "2", "3", "4", "6"]

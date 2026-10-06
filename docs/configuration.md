@@ -165,6 +165,62 @@ Every `.tmpl` file in the directory is fetched, rendered, and committed.
 The output filename is the template name with `.tmpl` stripped
 (e.g. `vpc.tf.tmpl` → `vpc.tf`).
 
+### Splitting requests into separate files
+
+A small repo can keep everything in `platformr.toml`. Once there are many requests,
+put them in separate files instead: **`platformr.toml` stays at the repo root** and
+keeps the shared settings, and each file in `platformr/requests/` holds the
+requests for one thing:
+
+```
+platformr.toml              shared: [defaults], reusable fields, shared [maps]
+platformr/requests/
+├── database.toml           [[resources]] for "New database", "Resize database"
+└── eks.toml                [[resources]] for "New cluster", "Upgrade cluster version"
+platformr/templates/...     unchanged
+```
+
+A request file is written exactly like the `[[resources]]` blocks in
+`platformr.toml`, so moving a request between them is cut and paste:
+
+```toml
+# platformr/requests/eks.toml
+[[resources]]
+name     = "eks"
+pr_title = "feat(eks): add {{.name}}"
+
+  [[resources.fields]]
+  name   = "account"
+  type   = "select"
+  source = "dirs:cloud/aws"
+```
+
+How it works:
+
+- **Optional.** No `platformr/requests/` folder means everything comes from
+  `platformr.toml`, as before. Requests can also live in both places while moving
+  them over.
+- **Shared settings apply everywhere.** `[defaults]` (including reusable
+  `[defaults.fields]`) and `[maps]` in `platformr.toml` apply to requests in every
+  file.
+- **A request file can add its own `[maps]`** (e.g. sizes only its requests use).
+  It can't set `[defaults]` or `requests_dir`; those belong in `platformr.toml`.
+- **Names must be unique** across `platformr.toml` and all request files, for both
+  requests and maps.
+- **A broken file only hides its own requests.** platformr shows a warning naming
+  the file and the problem (for example the line with the TOML error), and every
+  other request still works. `platformr doctor` lists the same warnings.
+- **Order.** The picker shows `platformr.toml`'s requests first, then each file's
+  requests in alphabetical file order.
+- **Different folder.** Set `requests_dir` at the top of `platformr.toml`:
+
+  ```toml
+  requests_dir = "ops/platformr-requests"
+
+  [defaults]
+  ...
+  ```
+
 ### Per-file target paths and conditional skipping
 
 By default every file in a `template_dir` is committed to the same `target_path`
@@ -860,13 +916,19 @@ module "vpc_{{.name}}" {
 ## Template functions
 
 In addition to standard Go `text/template` syntax, platformr provides the
-following helper functions for use in `.tmpl` files:
+following helper functions. They work anywhere `{{...}}` does: `.tmpl` files,
+`computed` values, `when`, `target_path`, `pr_title`, `instructions` and `output_path`.
+
+The value being changed always goes **last**, so each function also works at the
+end of a pipe: `{{replace "-" "_" .name}}` and `{{.name | replace "-" "_"}}` are
+the same thing.
 
 | Function | Signature | Example |
 |---|---|---|
 | `split` | `split sep str` | split comma-separated team IDs into a YAML list |
 | `trimPrefix` | `trimPrefix prefix str` | strip a known prefix from a value |
 | `trimSuffix` | `trimSuffix suffix str` | strip a known suffix from a value |
+| `trimSpace` | `trimSpace str` | drop leading/trailing whitespace from typed input |
 | `toLower` | `toLower str` | normalize user input to lowercase |
 | `toUpper` | `toUpper str` | normalize to uppercase |
 | `contains` | `contains substr str` | conditional block based on value content |
@@ -926,8 +988,11 @@ lowercase and cannot contain spaces):
 
 ```
 your-org/terraform-infra/
-├── platformr.toml                        ← resource definitions
+├── platformr.toml                        ← shared settings (and/or requests)
 ├── platformr/
+│   ├── requests/                         ← optional: one file of requests per thing
+│   │   ├── vpc.toml
+│   │   └── service.toml
 │   └── templates/
 │       ├── vpc/                          ← multi-file template dir
 │       │   ├── vpc.tf.tmpl

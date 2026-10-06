@@ -4,6 +4,14 @@ Future enhancements and feature ideas for platformr.
 
 ## Planned
 
+### Change requests — change what platformr created
+Resize a database, bump a cluster version, scale a service: pick something
+platformr created, see its current settings, change them, get a PR with just
+that change. Works for any IaC (Terragrunt, Crossplane, Helm, ...) as long as
+each resource has a file platformr fully owns. Design, patterns per tool and
+known pitfalls: [docs/changing-existing-resources.md](docs/changing-existing-resources.md).
+Examples: [examples/changeable/](examples/changeable/).
+
 ### `platformr setup` — Guided org onboarding wizard
 An interactive setup command for platform admins (not end users) that walks
 through the full org configuration:

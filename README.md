@@ -1,8 +1,10 @@
 # platformr
 
-A configurable developer self-service CLI. Developers request infrastructure
-and services interactively — platformr opens a pull request against your GitOps
-repos on their behalf. No cloud credentials, no IaC tooling, no context switching.
+**Self-service infrastructure requests that arrive as pull requests.**
+
+A developer answers a few questions in the terminal. platformr turns the answers
+into files in your infrastructure repo and opens a pull request. Your platform
+team reviews it and applies it the same way they handle any other change.
 
 ```
 brew install devops-chris/tap/platformr
@@ -10,17 +12,40 @@ platformr connect my-org
 platformr request
 ```
 
----
+## Why it helps
 
-## How it works
+- **Developers** don't need to know the repo layout, the IaC tool, or your naming
+  conventions. They pick from lists, and lists can come from the repo itself
+  (for example, "which existing VPC should this cluster use?").
+- **Platform teams** get every request as a consistent, reviewable PR that already
+  follows their conventions, instead of a ticket or chat message to translate by hand.
+- **Nothing new to run or trust.** No server, no cloud credentials, no state.
+  It uses GitHub and the PR process you already have.
 
-1. Developer runs `platformr request` and picks a resource type (service, database, VPC, etc.)
-2. CLI prompts for the required fields interactively
-3. Opens a PR against the appropriate IaC repo with a rendered template
-5. Your existing CI/CD (ArgoCD, Flux, Terraform Cloud) applies it as normal
+## What it does, and what it doesn't
 
-Resource types, templates, and target repos are entirely defined by your platform
-team — nothing is hardcoded in the binary.
+It **does**:
+
+1. Ask the questions you define.
+2. Fill in the templates you write, and put the files where you say.
+3. Open one PR, with optional instructions for whoever applies it.
+
+It **doesn't** apply anything, hold cloud credentials, or edit files that already
+exist. (Changing things platformr created is planned; see
+[Changing existing resources](docs/changing-existing-resources.md).) It knows nothing about your cloud or IaC tool; Terraform, Terragrunt,
+Crossplane and plain YAML all work the same way.
+
+## What you set up
+
+This is where most of these docs go, and it's a one-time job for the platform team:
+
+| Piece | Lives in | What it is |
+|---|---|---|
+| `platformr.toml` | each IaC repo (root) | The request types and the questions each one asks. Many requests? Keep shared settings here and put requests in `platformr/requests/*.toml` |
+| `platformr/templates/` | each IaC repo | The files a request generates, with `{{.answer}}` placeholders |
+| `.platformr/config.toml` | one org-level repo | Which IaC repos platformr reads |
+
+Developers only ever run `platformr request`.
 
 ---
 
