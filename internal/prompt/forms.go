@@ -144,10 +144,30 @@ func resolveOptions(field config.Field, ctx *FieldContext) ([]string, error) {
 		}
 		names = filtered
 	}
-	if field.StripPrefix != "" {
-		for i, n := range names {
-			names[i] = strings.TrimPrefix(n, field.StripPrefix)
+	if field.FilterSuffix != "" {
+		var filtered []string
+		for _, n := range names {
+			if strings.HasSuffix(n, field.FilterSuffix) {
+				filtered = append(filtered, n)
+			}
 		}
+		names = filtered
+	}
+	for i, n := range names {
+		names[i] = strings.TrimSuffix(strings.TrimPrefix(n, field.StripPrefix), field.StripSuffix)
+	}
+	if len(field.Exclude) > 0 {
+		var kept []string
+		for _, n := range names {
+			skip := false
+			for _, x := range field.Exclude {
+				skip = skip || n == x
+			}
+			if !skip {
+				kept = append(kept, n)
+			}
+		}
+		names = kept
 	}
 	return names, nil
 }

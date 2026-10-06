@@ -125,3 +125,28 @@ func TestRequestsDirPath(t *testing.T) {
 		t.Errorf("custom = %q", got)
 	}
 }
+
+func TestRendersTemplates(t *testing.T) {
+	create := Resource{Name: "vpc"}
+	change := Resource{Name: "scale", UpdateFile: "values.yaml"}
+	both := Resource{Name: "account", Changes: []ChangeConfig{{Action: "append"}}, TemplateFiles: []TemplateFileConfig{{Name: "account.hcl"}}}
+	if !create.RendersTemplates() || create.IsUpdate() {
+		t.Error("plain create request")
+	}
+	if change.RendersTemplates() || !change.IsUpdate() {
+		t.Error("plain change request")
+	}
+	if !both.RendersTemplates() || !both.IsUpdate() {
+		t.Error("create + change request should do both")
+	}
+}
+
+func TestResourceTemplateBeatsDefaultDir(t *testing.T) {
+	rc := loadRoot(t)
+	rc.Resources = append(rc.Resources, Resource{Name: "brand", Template: "platformr/templates/brand.tf.tmpl"})
+	Resolve(&OrgConfig{}, rc)
+	b := rc.Resources[len(rc.Resources)-1]
+	if b.Resolved.TemplateDir != "" || b.Resolved.Template != "platformr/templates/brand.tf.tmpl" {
+		t.Errorf("dir %q template %q", b.Resolved.TemplateDir, b.Resolved.Template)
+	}
+}

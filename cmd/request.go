@@ -14,6 +14,7 @@ import (
 	"github.com/devops-chris/clihq/ui"
 	"github.com/devops-chris/platformr/internal/auth"
 	"github.com/devops-chris/platformr/internal/config"
+	"github.com/devops-chris/platformr/internal/edit"
 	ghclient "github.com/devops-chris/platformr/internal/github"
 	"github.com/devops-chris/platformr/internal/prompt"
 	"github.com/devops-chris/platformr/internal/remote"
@@ -124,8 +125,18 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if sess != nil {
+	if sess != nil && !resource.RendersTemplates() {
 		return runUpdate(resource, repos, values, sess, ghWrite, gh, binaryName)
+	}
+
+	// Create + change in one request: make the edits first, then add the edited
+	// files to the rendered ones below.
+	var editChanges []edit.Change
+	var editFiles []ghclient.PRFile
+	if sess != nil {
+		if editChanges, editFiles, err = sess.apply(resource, values); err != nil {
+			return err
+		}
 	}
 
 	// Prompt for optional PR comment
@@ -212,6 +223,17 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		fmt.Println(ui.Subtle(fmt.Sprintf("Skipped %s (already exists in target repo)", name)))
 	}
 
+	rendered := map[string]bool{}
+	for _, f := range prFiles {
+		rendered[f.Path] = true
+	}
+	for _, f := range editFiles {
+		if rendered[f.Path] {
+			return fmt.Errorf("%s is both created from a template and changed by this request — the platform team needs to pick one in platformr.toml", f.Path)
+		}
+		prFiles = append(prFiles, f)
+	}
+
 	if len(prFiles) == 0 {
 		fmt.Println(ui.Warning("All template files already exist in the target repo — nothing to commit."))
 		return nil
@@ -220,7 +242,19 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	// Dry-run: print values + rendered output and exit without opening a PR
 	if requestDryRun {
 		printDryRun(resource, values, prFiles)
+		if len(editChanges) > 0 {
+			fmt.Printf("  %s\n", ui.SectionHeader("Changes to existing files"))
+			printChanges(editChanges)
+			fmt.Println()
+		}
 		return nil
+	}
+
+	if len(editChanges) > 0 {
+		fmt.Println()
+		fmt.Println(ui.SectionHeader("This request also changes:"))
+		printChanges(editChanges)
+		fmt.Println()
 	}
 
 	// Confirm — show target path (dir for multi-file, full path for single-file)
@@ -269,7 +303,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 				Branch:        fmt.Sprintf("platformr/%s-%s", resource.Name, resolveSlug(resource, values)),
 				BaseBranch:    resource.Resolved.BaseBranch,
 				Title:         template.RenderString(resource.PRTitle, values, remote.MapsFor(resource, repos)),
-				Body:          buildPRBody(resource.Name, values, comment, template.RenderString(resource.Instructions, values, remote.MapsFor(resource, repos)), outputSectionMarkdown(resource, values, repos)),
+				Body:          buildPRBody(resource.Name, values, comment, template.RenderString(resource.Instructions, values, remote.MapsFor(resource, repos)), changesMarkdown(editChanges)+outputSectionMarkdown(resource, values, repos)),
 				Files:         prFiles,
 				Reviewers:     reviewers,
 				TeamReviewers: teamReviewers,
@@ -494,7 +528,7 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 		// "[+ enter manually]" on a dirs:/files:-sourced field means "let me type a
 		// value instead of picking one" — just fall through to a plain text prompt.
 		if val == prompt.ManualEntryOption &&
-			(strings.HasPrefix(field.Source, "dirs:") || strings.HasPrefix(field.Source, "files:")) {
+			(strings.HasPrefix(field.Source, "dirs:") || strings.HasPrefix(field.Source, "files:") || field.List != nil) {
 			typed, err := prompt.PromptField(config.Field{Name: field.Name, Label: field.Label, Type: "input", Placeholder: field.Placeholder}, values, nil)
 			if err != nil {
 				return nil, err

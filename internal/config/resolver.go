@@ -38,7 +38,11 @@ func Resolve(orgCfg *OrgConfig, repo *RepoConfig) {
 		r.Resolved.TargetPath = renderPattern(targetPath, r.Name)
 
 		// Template dir (multi-file) takes precedence over single-file template.
-		tmplDir := coalesce(r.TemplateDir, repo.Defaults.TemplateDirPath, orgCfg.Defaults.TemplateDirPath)
+		// A resource's own single-file `template` wins over a repo/org default template dir.
+		tmplDir := r.TemplateDir
+		if tmplDir == "" && r.Template == "" {
+			tmplDir = coalesce(repo.Defaults.TemplateDirPath, orgCfg.Defaults.TemplateDirPath)
+		}
 		r.Resolved.TemplateDir = renderPattern(tmplDir, r.Name)
 
 		// Template path (single-file): resource → repo default → org default

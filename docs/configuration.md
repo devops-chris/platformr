@@ -446,7 +446,7 @@ update_file  = 'apps/{{.name}}/values.yaml'
 | Setting | What it does |
 |---|---|
 | `key` | Where in the file this answer goes. The question starts on the current value, shown as "(now: …)", and the current value is always offered even if it's not in `options` |
-| `list` | Fill a select with the items of a list (or the names in a map) in the file |
+| `list` | Fill a select with the items of a list (or the names in a map) in the file. Add `allow_manual = true` to also offer typing a new value |
 | `show` | With `list`, which field to display when the items are objects |
 | `update_file`, `format` | Use a different file for this one question |
 
@@ -461,8 +461,14 @@ update_file  = 'apps/{{.name}}/values.yaml'
 | `name` | The map entry for `put` / `delete` |
 | `value` | The new value for `set` |
 | `unique_by` | Stop an `append` if the item is already there: `"value"` or a field name |
+| `if_exists` | With `unique_by`: `"error"` (default) stops the request, `"skip"` leaves the list as it is and carries on |
 | `file`, `format` | Use a different file; for `delete_file`, the file to delete |
 | `when` | Skip this change unless the expression is `"true"` |
+
+**Creating and changing in one request.** A request that names templates
+(`template`, `template_dir` or `template_files`) *and* has changes does both in one
+PR: it renders the new files and edits the existing ones. For example, a new
+account's folder plus its name appended to the organization's account list.
 
 **Keys** are a dotted path (`"resources.requests.cpu"`, `"module.eks.cluster_version"`),
 or a list when a name contains dots or you need to pick a list item:
@@ -680,6 +686,18 @@ target_path_suffix = "platform-{{.project}}/"
 ```
 
 `strip_prefix` applies to `dirs:`, `files:`, `team:`, and `collaborators` sources.
+
+The same works at the end of names, and specific entries can be left out:
+
+```toml
+[[resources.fields]]
+name          = "group"
+type          = "select"
+source        = "files:cloud/aws/pt-management/global/organization"
+filter_suffix = "-accounts"               # only *-accounts files
+strip_suffix  = "-accounts"               # "ortho-tops-accounts" is shown as "ortho-tops"
+exclude       = ["pt-corp", "pt-security"] # never offer these (compared after stripping)
+```
 
 ### Dynamic select — `source = "dirs:<path>"`
 

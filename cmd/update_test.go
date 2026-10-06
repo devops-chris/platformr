@@ -92,6 +92,17 @@ update_file = "network/sg.auto.tfvars"
   unique_by = "value"
 
 [[resources]]
+name        = "add-ou"
+update_file = "clusters/{{.name}}/access.yaml"
+
+  [[resources.changes]]
+  action    = "append"
+  key       = "users"
+  item      = { name = "{{.username}}", role = "admin" }
+  unique_by = "name"
+  if_exists = "skip"
+
+[[resources]]
 name = "eks-remove-user-file"
 
   [[resources.changes]]
@@ -271,5 +282,18 @@ update_file = "x/job.vars"
 		if errs := checkUpdateConfig(r); len(errs) > 0 {
 			t.Errorf("%s: %v", name, errs)
 		}
+	}
+}
+
+func TestAppendIfExistsSkip(t *testing.T) {
+	r, sess := testRequest(t, "add-ou")
+	changes, files, err := sess.apply(r, map[string]string{"name": "apps", "username": "jane"})
+	if err != nil || len(files) != 0 || len(changes) != 0 {
+		t.Errorf("already there + skip should change nothing: %v %v %v", changes, files, err)
+	}
+	r, sess = testRequest(t, "add-ou")
+	_, files, err = sess.apply(r, map[string]string{"name": "apps", "username": "lee"})
+	if err != nil || len(files) != 1 {
+		t.Errorf("new item should still be added: %v %v", files, err)
 	}
 }

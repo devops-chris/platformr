@@ -175,6 +175,9 @@ type Field struct {
 	Optional     bool     `toml:"optional"`      // if true, field may be left blank; use {{if .field}} in templates
 	StripPrefix  string   `toml:"strip_prefix"`  // remove this prefix from dynamically sourced option values
 	FilterPrefix string   `toml:"filter_prefix"` // only include options that start with this prefix
+	FilterSuffix string   `toml:"filter_suffix"` // only include options that end with this suffix
+	StripSuffix  string   `toml:"strip_suffix"`  // remove this suffix from dynamically sourced option values
+	Exclude      []string `toml:"exclude"`       // leave these out of the options (after stripping)
 	When         string   `toml:"when"`          // Go template expression — field is skipped when result is not "true"
 	// Pattern is a regex with exactly one capture group, used by type = "file_lookup"
 	// to extract a value out of the file at Source. No prompt is shown; a fetch
@@ -224,6 +227,18 @@ type ChangeConfig struct {
 	Format string `toml:"format"`
 	// When skips this change unless it renders to "true", like a field's when.
 	When string `toml:"when"`
+	// IfExists decides what an append with unique_by does when the item is already
+	// there: "error" (default) stops the request; "skip" leaves the list as it is.
+	IfExists string `toml:"if_exists"`
+}
+
+// RendersTemplates reports whether this request creates files from templates. A
+// plain create request does; a change request does only if it names templates
+// itself (template, template_dir or template_files), so one request can create new
+// files and edit existing ones in the same PR, e.g. a new account's folder plus its
+// entry in the organization's account list.
+func (r Resource) RendersTemplates() bool {
+	return !r.IsUpdate() || r.Template != "" || r.TemplateDir != "" || len(r.TemplateFiles) > 0
 }
 
 // IsUpdate reports whether this is a change request (edits existing files) rather

@@ -217,6 +217,15 @@ data "aws_iam_policy_document" "ci" {
   ])
 }
 `, edit.Op{Action: "append", Path: P("locals.pt_shared_prod_accounts"), Item: edit.Item{Value: "pt-shared-prod-ai"}})
+	run(t, "hcl_empty_lists", edit.HCL, "group.tf", `locals {
+  acme_non_prod_accounts = toset([
+  ])
+  acme_prod_accounts = toset([])
+}
+`,
+		edit.Op{Action: "append", Path: P("locals.acme_non_prod_accounts"), Item: edit.Item{Value: "pt-ortho-acme-dev-services"}},
+		edit.Op{Action: "append", Path: P("locals.acme_prod_accounts"), Item: edit.Item{Value: "pt-ortho-acme-prod-services"}},
+	)
 	run(t, "hcl_tfvars", edit.HCL, "terraform.tfvars", "cluster_version = \"1.32\"\nnode_count      = 3\n", edit.Op{Action: "set", Path: P("cluster_version"), Value: "1.33"})
 }
 

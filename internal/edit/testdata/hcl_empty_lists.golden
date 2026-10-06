@@ -1,0 +1,9 @@
+locals.acme_non_prod_accounts: + pt-ortho-acme-dev-services
+locals.acme_prod_accounts: + pt-ortho-acme-prod-services
+----- group.tf -----
+locals {
+  acme_non_prod_accounts = toset([
+    "pt-ortho-acme-dev-services",
+  ])
+  acme_prod_accounts = toset(["pt-ortho-acme-prod-services"])
+}

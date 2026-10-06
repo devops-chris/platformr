@@ -180,7 +180,13 @@ match = { name = "{{.username}}" }
 ```
 
 **`unique_by`** stops an `append` when the item is already there:
-`unique_by = "value"` for plain lists, or a field name (`"name"`) for objects.
+`unique_by = "value"` for plain lists, or a field name (`"name"`) for objects. Add
+`if_exists = "skip"` to carry on without adding it instead.
+
+**Creating and changing together.** A request can also render templates
+(`template`, `template_dir` or `template_files`) and make changes in the same PR,
+for example a new account's folder plus its entry in the organization's account
+list. Nobody has to make two requests that must agree with each other.
 
 **Pickers for "remove" requests.** `list` on a question fills it with what's in the
 file now, so the developer can only pick something that exists:
@@ -192,6 +198,9 @@ file now, so the developer can only pick something that exists:
   list = "users"
   show = "name"      # users are objects; list them by name. Not needed for plain values or map names.
 ```
+
+Add `allow_manual = true` to also offer "[+ enter manually]", for a value that isn't
+in the list yet.
 
 **`when`** on a change skips it unless the expression is true, the same as on a
 question.

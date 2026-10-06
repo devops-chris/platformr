@@ -489,7 +489,13 @@ func (d *hclDoc) apply(op Op) (Change, error) {
 		}
 		open, close := d.start(t), d.end(t)-1
 		if len(t.Exprs) == 0 {
-			d.insertEmpty(open, close, hclItem(op.Item, nil, indentOf(d.src, open)+"  ", false), false)
+			// An empty list written across lines stays that way, with a trailing comma.
+			multi := d.spansLines(open, close)
+			text := hclItem(op.Item, nil, indentOf(d.src, open)+"  ", false)
+			if multi {
+				text += ","
+			}
+			d.insertEmpty(open, close, text, multi)
 		} else {
 			last := t.Exprs[len(t.Exprs)-1]
 			multi := d.spansLines(d.start(last), d.end(last))

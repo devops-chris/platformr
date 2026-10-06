@@ -256,6 +256,9 @@ func (u *updateSession) apply(resource config.Resource, values map[string]string
 				return nil, nil, fmt.Errorf("%s: %w", file, err)
 			}
 			if contains(existing, want) {
+				if c.IfExists == "skip" {
+					continue // already there, and that's fine
+				}
 				return nil, nil, fmt.Errorf("%s is already in %s", want, p)
 			}
 		}
@@ -532,6 +535,8 @@ func checkUpdateConfig(r config.Resource) []error {
 			need(c.Value != "", "value")
 		case "append":
 			need(c.Item != nil, "item")
+			need(c.IfExists == "" || c.IfExists == "error" || c.IfExists == "skip", `if_exists = "error" or "skip"`)
+			need(c.IfExists == "" || c.UniqueBy != "", "unique_by (if_exists only applies with unique_by)")
 		case "put":
 			need(c.Item != nil, "item")
 			need(c.Name != "", "name")
