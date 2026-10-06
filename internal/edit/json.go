@@ -74,8 +74,8 @@ func (p *jparser) value() (*jnode, error) {
 		return nil, fmt.Errorf("unexpected end of file")
 	}
 	start := p.i
-	switch c := p.src[p.i]; {
-	case c == '{':
+	switch p.src[p.i] {
+	case '{':
 		n := &jnode{kind: jObject, start: start}
 		p.i++
 		p.ws()
@@ -119,7 +119,7 @@ func (p *jparser) value() (*jnode, error) {
 			}
 			return nil, fmt.Errorf("expected , or } at byte %d", p.i)
 		}
-	case c == '[':
+	case '[':
 		n := &jnode{kind: jArray, start: start}
 		p.i++
 		p.ws()
@@ -147,7 +147,7 @@ func (p *jparser) value() (*jnode, error) {
 			}
 			return nil, fmt.Errorf("expected , or ] at byte %d", p.i)
 		}
-	case c == '"':
+	case '"':
 		p.i++
 		for p.i < len(p.src) && p.src[p.i] != '"' {
 			if p.src[p.i] == '\\' {
@@ -170,10 +170,10 @@ func (p *jparser) value() (*jnode, error) {
 		}
 		lit := string(p.src[start:p.i])
 		var kind jkind
-		switch {
-		case lit == "true" || lit == "false":
+		switch lit {
+		case "true", "false":
 			kind = jBool
-		case lit == "null":
+		case "null":
 			kind = jNull
 		default:
 			var f float64

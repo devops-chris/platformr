@@ -148,10 +148,8 @@ func notPlain(p Path) error {
 // repeated blocks), attributes, and object/list values. It returns the expression at
 // the end of the path.
 func (d *hclDoc) resolve(p Path) (hclsyntax.Expression, error) {
-	var (
-		body *hclsyntax.Body = d.body
-		expr hclsyntax.Expression
-	)
+	body := d.body
+	var expr hclsyntax.Expression
 	for i := 0; i < len(p); i++ {
 		s := p[i]
 		if body != nil {
