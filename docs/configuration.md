@@ -401,6 +401,85 @@ Supports `{{.field}}` interpolation like `output_path`. Absent means no
 section is shown — most resources probably don't need one; it's for the cases
 where "just merge it" isn't actually the whole story.
 
+### Change requests: editing existing files
+
+A request with `update_file`, a question with `key` or `list`, or any
+`[[resources.changes]]` is a **change request**: it changes values inside an
+existing file instead of rendering templates into new ones. The step-by-step
+guide is [changing-existing-resources.md](changing-existing-resources.md);
+four tested examples are in [`examples/changeable/`](../examples/changeable/).
+
+```toml
+[[resources]]
+name         = "service-scale"
+category     = "Service"
+display_name = "Scale service"
+update_file  = 'apps/{{.name}}/values.yaml'
+
+  [[resources.fields]]
+  name   = "name"
+  type   = "select"
+  source = "dirs:apps"
+
+  [[resources.fields]]
+  name    = "replicas"
+  type    = "select"
+  options = ["1", "2", "3", "4", "6"]
+  key     = "replicaCount"            # starts on the current value, writes the answer back
+
+  [[resources.changes]]
+  action    = "append"
+  key       = "env"
+  item      = { name = "SCALED_BY", value = "platformr" }
+  unique_by = "name"
+```
+
+**On the request**
+
+| Setting | What it does |
+|---|---|
+| `update_file` | The file to change (supports `{{.field}}`). Read from the base branch |
+| `format` | `yaml`, `json`, `hcl`, `env` or `marker`, when the extension doesn't say |
+
+**On a question**
+
+| Setting | What it does |
+|---|---|
+| `key` | Where in the file this answer goes. The question starts on the current value, shown as "(now: …)", and the current value is always offered even if it's not in `options` |
+| `list` | Fill a select with the items of a list (or the names in a map) in the file |
+| `show` | With `list`, which field to display when the items are objects |
+| `update_file`, `format` | Use a different file for this one question |
+
+**`[[resources.changes]]`**
+
+| Setting | What it does |
+|---|---|
+| `action` | `append`, `remove`, `put`, `delete`, `set` or `delete_file` |
+| `key` | Where in the file (lists and maps for append/remove/put/delete) |
+| `item` | What `append` / `put` adds: `"{{.cidr}}"` or `{ name = "{{.user}}", role = "admin" }` |
+| `match` | What `remove` takes out: `"{{.cidr}}"` or `{ name = "{{.user}}" }` |
+| `name` | The map entry for `put` / `delete` |
+| `value` | The new value for `set` |
+| `unique_by` | Stop an `append` if the item is already there: `"value"` or a field name |
+| `file`, `format` | Use a different file; for `delete_file`, the file to delete |
+| `when` | Skip this change unless the expression is `"true"` |
+
+**Keys** are a dotted path (`"resources.requests.cpu"`, `"module.eks.cluster_version"`),
+or a list when a name contains dots or you need to pick a list item:
+`["Statement", { Sid = "{{.sid}}" }, "Action"]`, `["users", 0]`.
+`"marker:<name>"` points at a line tagged with a `platformr:<name>` comment, in any
+file type.
+
+**Formats** come from the extension: `.yaml`/`.yml` → YAML; `.json`, `.tf.json`,
+`.tfvars.json` → JSON; `.tf`, `.tfvars`, `.hcl`, `.nomad` → HCL; `.env`,
+`.properties`, `.ini` → key=value.
+
+**Checks:** the request's config is checked before any question is asked (missing
+file, unknown format, a change missing what its action needs), and `platformr doctor`
+reports the same problems for every request. If a platformr PR changing the same file
+is still open, the request stops and links to it. If nothing would change, no PR is
+opened.
+
 ---
 
 ## Resource display names
@@ -554,7 +633,9 @@ optional = true
 
 ### Input defaults and placeholders
 
-If `default` is set, the input is pre-filled with that value.
+If `default` is set, the input is pre-filled with that value. On a select, the list
+starts on it. Both `default` and `placeholder` can use earlier answers:
+`default = "{{.current_version}}"`.
 If only `placeholder` is set (no `default`), the input is pre-filled with the
 placeholder — the user can accept it by pressing Enter or type to replace it.
 
@@ -888,8 +969,12 @@ conditionally render blocks that depend on them:
 ### Field validation
 
 ```toml
-validate = "unique"   # checks that no file named <value>.yaml exists at target_path
+validate = "unique"
 ```
+
+For a request that creates a folder per instance (`template_dir`), this checks that
+the rendered `target_path` folder doesn't exist yet. For single-file requests, it
+checks `target_path` + `file_name` + `file_ext` (default: `<first field>.yaml`).
 
 platformr checks the target repo before confirming — exits with an error if a
 conflict is found.

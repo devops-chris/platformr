@@ -4,13 +4,13 @@ Future enhancements and feature ideas for platformr.
 
 ## Planned
 
-### Change requests — change what platformr created
-Resize a database, bump a cluster version, scale a service: pick something
-platformr created, see its current settings, change them, get a PR with just
-that change. Works for any IaC (Terragrunt, Crossplane, Helm, ...) as long as
-each resource has a file platformr fully owns. Design, patterns per tool and
-known pitfalls: [docs/changing-existing-resources.md](docs/changing-existing-resources.md).
-Examples: [examples/changeable/](examples/changeable/).
+### Change requests: what's next
+Change requests (editing values, lists and maps in existing YAML, JSON, HCL,
+key=value and line-marked files) shipped. Next:
+- **TOML** files (needs an editor that keeps comments).
+- **Adding a whole HCL block** (another `ingress { }` in a security group).
+- **Lists of lists / maps inside list items** beyond one level of fields.
+- **Adopting** a resource into a different layout (moving values out of a shared file).
 
 ### `platformr setup` — Guided org onboarding wizard
 An interactive setup command for platform admins (not end users) that walks

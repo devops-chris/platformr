@@ -30,9 +30,12 @@ It **does**:
 2. Fill in the templates you write, and put the files where you say.
 3. Open one PR, with optional instructions for whoever applies it.
 
-It **doesn't** apply anything, hold cloud credentials, or edit files that already
-exist. (Changing things platformr created is planned; see
-[Changing existing resources](docs/changing-existing-resources.md).) It knows nothing about your cloud or IaC tool; Terraform, Terragrunt,
+It **also** handles day-2 changes: scale a service, upgrade a cluster, allow an IP,
+add a permission. A change request edits just the values it asks about in an existing
+file (YAML, JSON, HCL and more) and opens a PR with that one change. See
+[Changing existing resources](docs/changing-existing-resources.md).
+
+It **doesn't** apply anything or hold cloud credentials. It knows nothing about your cloud or IaC tool; Terraform, Terragrunt,
 Crossplane and plain YAML all work the same way.
 
 ## What you set up
