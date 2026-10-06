@@ -80,6 +80,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	if loadErr != nil {
 		return fmt.Errorf("loading resources: %w", loadErr)
 	}
+	printLoadWarnings(loader)
 
 	allResources := remote.AllResources(repos)
 	if len(allResources) == 0 {

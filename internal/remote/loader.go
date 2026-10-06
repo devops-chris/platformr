@@ -32,6 +32,10 @@ func refFor(configuredRef string) string {
 // No local config files are needed beyond the connected org name.
 type Loader struct {
 	gh *github.Client
+	// Warnings collects config problems found by LoadAll that hid some requests but
+	// didn't stop the others: a platformr.toml or request file that doesn't parse,
+	// a duplicate name. Commands print them so a config mistake is never silent.
+	Warnings []string
 }
 
 func New(token string) *Loader {
@@ -53,9 +57,15 @@ func (l *Loader) LoadAll(orgName string) (*config.OrgConfig, []*config.RepoConfi
 
 		repoCfg, err := l.loadRepoConfig(repoURL, refFor(repoRef.Ref))
 		if err != nil {
-			// Non-fatal: repo may not have a platformr.toml yet
+			// A repo without a platformr.toml just isn't set up yet — skip it quietly.
+			// Anything else (usually a typo) hides all of its requests, so say so.
+			if !github.IsNotFound(err) {
+				l.Warnings = append(l.Warnings, fmt.Sprintf(
+					"%s: platformr.toml couldn't be read, so none of its requests are shown. Fix it and try again.\n  %v", repoURL, err))
+			}
 			continue
 		}
+		l.loadRequestFiles(repoCfg)
 
 		config.Resolve(orgCfg, repoCfg)
 		repos = append(repos, repoCfg)
@@ -123,6 +133,33 @@ func (l *Loader) loadRepoConfig(repoURL, ref string) (*config.RepoConfig, error)
 	cfg.RepoRef = ref
 
 	return &cfg, nil
+}
+
+// loadRequestFiles adds every *.toml in the repo's requests folder to repoCfg. The
+// folder is optional. A file with a problem is skipped with a warning; the rest load.
+func (l *Loader) loadRequestFiles(repoCfg *config.RepoConfig) {
+	dir := repoCfg.RequestsDirPath()
+	files, err := l.gh.FetchDirFiles(repoCfg.RepoName, dir, repoCfg.RepoRef, ".toml")
+	if err != nil {
+		if !github.IsNotFound(err) {
+			l.Warnings = append(l.Warnings, fmt.Sprintf(
+				"%s: couldn't read request files in %s, so they aren't shown.\n  %v", repoCfg.RepoName, dir, err))
+		}
+		return
+	}
+	byName := map[string]string{}
+	var names []string
+	for _, f := range files {
+		byName[f.Name] = f.Content
+		names = append(names, f.Name)
+	}
+	for _, name := range config.SortedFileNames(names) {
+		path := dir + "/" + name
+		if err := repoCfg.AddRequestFile(path, byName[name]); err != nil {
+			l.Warnings = append(l.Warnings, fmt.Sprintf(
+				"%s: skipped %s, so its requests aren't shown. Fix it and try again.\n  %v", repoCfg.RepoName, path, err))
+		}
+	}
 }
 
 // ResolveRepoURL expands a shorthand repo name to "org/repo" format.

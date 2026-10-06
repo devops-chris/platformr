@@ -181,6 +181,12 @@ func runDoctor(_ *cobra.Command, _ []string) error {
 		}
 	}
 
+	// Problems that hid some requests without failing the whole repo.
+	for _, w := range loader.Warnings {
+		title, hint, _ := strings.Cut(w, "\n")
+		warn(title, strings.TrimSpace(hint))
+	}
+
 	fmt.Println()
 	return nil
 }

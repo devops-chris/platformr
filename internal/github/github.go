@@ -28,6 +28,9 @@ func IsUnauthorized(err error) bool {
 	return false
 }
 
+// IsNotFound reports whether err (or anything it wraps) is a GitHub API 404.
+func IsNotFound(err error) bool { return isNotFound(err) }
+
 // isNotFound reports whether err is a GitHub API 404 response — the signature of
 // a path that simply doesn't exist yet (e.g. no instances of a resource have ever
 // been created under it), as opposed to a real failure. Callers that list
@@ -111,6 +114,16 @@ func (c *Client) FetchFile(repo, path, ref string) (string, error) {
 // FetchTemplateDir lists and fetches all .tmpl files from a directory in a GitHub repo.
 // ref is the branch/tag/SHA to fetch from; empty string uses the repo's default branch.
 func (c *Client) FetchTemplateDir(repo, dirPath, ref string) ([]TemplateFile, error) {
+	files, err := c.FetchDirFiles(repo, dirPath, ref, ".tmpl")
+	if err != nil {
+		return nil, fmt.Errorf("listing template dir %s in %s: %w", dirPath, repo, err)
+	}
+	return files, nil
+}
+
+// FetchDirFiles fetches every file directly inside dirPath whose name ends in suffix
+// (not subdirectories). A missing directory returns an error IsNotFound recognizes.
+func (c *Client) FetchDirFiles(repo, dirPath, ref, suffix string) ([]TemplateFile, error) {
 	owner, repoName, err := parseRepo(repo)
 	if err != nil {
 		return nil, err
@@ -121,16 +134,16 @@ func (c *Client) FetchTemplateDir(repo, dirPath, ref string) ([]TemplateFile, er
 	}
 	_, contents, _, err := c.client.Repositories.GetContents(context.Background(), owner, repoName, dirPath, opts)
 	if err != nil {
-		return nil, fmt.Errorf("listing template dir %s in %s: %w", dirPath, repo, err)
+		return nil, err
 	}
 	var files []TemplateFile
 	for _, item := range contents {
-		if item.GetType() != "file" || !strings.HasSuffix(item.GetName(), ".tmpl") {
+		if item.GetType() != "file" || !strings.HasSuffix(item.GetName(), suffix) {
 			continue
 		}
 		data, err := c.FetchFile(repo, item.GetPath(), ref)
 		if err != nil {
-			return nil, fmt.Errorf("fetching template %s: %w", item.GetName(), err)
+			return nil, fmt.Errorf("fetching %s: %w", item.GetName(), err)
 		}
 		files = append(files, TemplateFile{Name: item.GetName(), Content: data})
 	}

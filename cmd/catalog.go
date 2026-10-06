@@ -60,6 +60,7 @@ func runCatalog(cmd *cobra.Command, args []string) error {
 	if loadErr != nil {
 		return fmt.Errorf("loading catalog: %w", loadErr)
 	}
+	printLoadWarnings(loader)
 
 	allResources := remote.AllResources(repos)
 

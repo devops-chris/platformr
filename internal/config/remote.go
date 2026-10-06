@@ -47,8 +47,13 @@ type RepoRef struct {
 // RepoConfig is fetched from each IaC repo's platformr.toml.
 // Templates and resource definitions live alongside the IaC they describe.
 type RepoConfig struct {
-	Defaults  ResourceDefaults `toml:"defaults"`
-	Resources []Resource       `toml:"resources"`
+	// RequestsDir is an optional folder of extra request files, each holding
+	// [[resources]] (and optionally [maps]) exactly as they'd be written here.
+	// Lets a repo with many requests keep one file per thing instead of one huge
+	// platformr.toml. Defaults to DefaultRequestsDir; a missing folder is fine.
+	RequestsDir string           `toml:"requests_dir"`
+	Defaults    ResourceDefaults `toml:"defaults"`
+	Resources   []Resource       `toml:"resources"`
 	// Maps defines named lookup tables available in templates via {{index .maps.<name> <key>}}.
 	// Useful for mapping computed values (e.g. account name → AWS account ID) without prompting.
 	Maps map[string]map[string]string `toml:"maps"`

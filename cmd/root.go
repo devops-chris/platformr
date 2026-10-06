@@ -84,3 +84,11 @@ func initConfig() {
 		log.Fatal("Error loading local config", "err", err)
 	}
 }
+
+// printLoadWarnings shows config problems that hid some requests (a request file
+// that doesn't parse, a duplicate name) so they're never silent.
+func printLoadWarnings(loader *remote.Loader) {
+	for _, w := range loader.Warnings {
+		fmt.Println(ui.Warning(w))
+	}
+}
