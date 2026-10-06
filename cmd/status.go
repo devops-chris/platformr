@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
@@ -514,20 +513,5 @@ func statusLabel(state string) string {
 		return ui.Success(fmt.Sprintf("%-6s", "Merged"))
 	default:
 		return ui.Subtle(fmt.Sprintf("%-6s", "Closed"))
-	}
-}
-
-func humanAge(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	d := time.Since(t)
-	switch {
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
 	}
 }
