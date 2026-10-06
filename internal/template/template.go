@@ -7,15 +7,18 @@ import (
 	"text/template"
 )
 
+// The string being operated on is always the LAST argument, so these work in a
+// pipeline: {{.name | replace "-" "_"}} passes .name last. Same convention as
+// Sprig/Helm. Wrapping the strings package directly would put it first instead.
 var funcMap = template.FuncMap{
-	"split":      strings.Split,
-	"trimPrefix": strings.TrimPrefix,
-	"trimSuffix": strings.TrimSuffix,
+	"split":      func(sep, s string) []string { return strings.Split(s, sep) },
+	"trimPrefix": func(prefix, s string) string { return strings.TrimPrefix(s, prefix) },
+	"trimSuffix": func(suffix, s string) string { return strings.TrimSuffix(s, suffix) },
 	"trimSpace":  strings.TrimSpace,
 	"toLower":    strings.ToLower,
 	"toUpper":    strings.ToUpper,
-	"contains":   strings.Contains,
-	"replace":    strings.ReplaceAll,
+	"contains":   func(substr, s string) bool { return strings.Contains(s, substr) },
+	"replace":    func(old, new, s string) string { return strings.ReplaceAll(s, old, new) },
 }
 
 // Render executes a template string with the given values.
@@ -39,7 +42,7 @@ func Render(content string, values map[string]string, maps ...map[string]map[str
 // Returns the original string unchanged if parsing or execution fails.
 // Accepts an optional maps argument — same semantics as Render.
 func RenderString(s string, values map[string]string, maps ...map[string]map[string]string) string {
-	t, err := template.New("str").Option("missingkey=zero").Parse(s)
+	t, err := template.New("str").Funcs(funcMap).Option("missingkey=zero").Parse(s)
 	if err != nil {
 		return s
 	}
