@@ -376,7 +376,7 @@ func printUpdateDryRun(changes []edit.Change, files []ghclient.PRFile, before ma
 			continue
 		}
 		for _, line := range lineDiff(string(before[f.Path]), f.Content) {
-			fmt.Println("    " + line)
+			fmt.Println("    " + colorDiffLine(line))
 		}
 	}
 	fmt.Println()

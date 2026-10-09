@@ -782,7 +782,7 @@ func printDryRun(resource config.Resource, values map[string]string, files []ghc
 	fmt.Printf("\n  %s\n  %s\n", ui.SectionHeader("Files"), divider)
 	for _, file := range files {
 		fmt.Printf("\n  %s %s\n\n", ui.Subtle("→"), file.Path)
-		for _, line := range strings.Split(strings.TrimRight(file.Content, "\n"), "\n") {
+		for _, line := range strings.Split(strings.TrimRight(highlight(file.Path, file.Content), "\n"), "\n") {
 			fmt.Printf("    %s\n", line)
 		}
 	}

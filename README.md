@@ -69,7 +69,8 @@ platformr auth
 # Make a request
 platformr request
 
-# Preview what a request would render — no PR opened
+# Preview what a request would render — no PR opened (syntax-highlighted;
+# NO_COLOR=1 turns colors off, FORCE_COLOR=1 keeps them when piping)
 platformr request vpc --dry-run
 
 # See what's available
