@@ -864,6 +864,27 @@ A fetch failure, a pattern with no match, or a pattern with no capture group are
 downstream (a path, a template) where a silently empty or wrong value would be worse
 than the request just failing loudly.
 
+Two options for files that aren't always there, or not always in the same place:
+
+```toml
+# brand is only set in some accounts: empty instead of an error when it's missing
+[[resources.fields]]
+name     = "brand"
+type     = "file_lookup"
+source   = "cloud/aws/{{.account}}/account.hcl"
+pattern  = '(?m)^\s*brand\s*=\s*"([^"]*)"'
+optional = true
+
+# env.hcl sits at different depths in different accounts: look in this folder, then
+# each folder above it, like Terragrunt's find_in_parent_folders
+[[resources.fields]]
+name           = "environment"
+type           = "file_lookup"
+source         = "cloud/aws/{{.account}}/{{.where}}/env.hcl"
+pattern        = '(?m)^\s*environment\s*=\s*"([^"]*)"'
+search_parents = true
+```
+
 ---
 
 ### Reusable fields — `[defaults.fields]`

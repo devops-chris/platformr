@@ -184,6 +184,11 @@ type Field struct {
 	// failure or non-match is a hard error, since a silently empty/wrong value here
 	// could quietly corrupt anything downstream that references this field.
 	Pattern string `toml:"pattern"`
+	// SearchParents makes a file_lookup look for Source's file name in Source's folder,
+	// then each parent folder up to the repo root, and use the first one found — like
+	// Terragrunt's find_in_parent_folders. For files such as env.hcl that sit at
+	// different depths in different accounts.
+	SearchParents bool `toml:"search_parents"`
 	// Key points at a value in the request's update_file (or this field's own
 	// update_file): the question starts on the current value there, and the answer is
 	// written back to the same spot. A string is a dotted path ("resources.requests.cpu");

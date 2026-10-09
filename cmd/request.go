@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	pathpkg "path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -685,9 +686,21 @@ func firstFieldName(resource config.Resource) string {
 // against its content. Fetch failure, no match, or a pattern with no capture
 // group are all hard errors — this typically feeds paths or templates downstream,
 // so a silent empty/wrong value would be worse than stopping the request here.
+// Two exceptions, both opted into: optional = true returns "" when the file or the
+// match is missing, and search_parents = true walks up from the folder to find the file.
 func resolveFileLookup(field config.Field, resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, values map[string]string) (string, error) {
-	path := template.RenderString(field.Source, values, remote.MapsFor(resource, repos))
+	fetch := func(p string) (string, error) {
+		c, err := gh.FetchFile(resource.Resolved.TemplateRepo, p, resource.Resolved.TemplateRef)
+		if ghclient.IsNotFound(err) {
+			return "", errFileNotFound
+		}
+		return c, err
+	}
+	return fileLookup(field, template.RenderString(field.Source, values, remote.MapsFor(resource, repos)), fetch)
+}
 
+// fileLookup is resolveFileLookup without GitHub, so it can be tested.
+func fileLookup(field config.Field, file string, fetch func(string) (string, error)) (string, error) {
 	re, err := regexp.Compile(field.Pattern)
 	if err != nil {
 		return "", fmt.Errorf("field %q: invalid pattern %q: %w", field.Name, field.Pattern, err)
@@ -696,14 +709,47 @@ func resolveFileLookup(field config.Field, resource config.Resource, repos []*co
 		return "", fmt.Errorf("field %q: pattern %q has no capture group", field.Name, field.Pattern)
 	}
 
-	content, err := gh.FetchFile(resource.Resolved.TemplateRepo, path, resource.Resolved.TemplateRef)
-	if err != nil {
-		return "", fmt.Errorf("field %q: fetching %s: %w", field.Name, path, err)
+	candidates := []string{file}
+	if field.SearchParents {
+		dir, name := pathpkg.Dir(file), pathpkg.Base(file)
+		for dir != "." && dir != "/" && dir != "" {
+			dir = pathpkg.Dir(dir)
+			if dir == "." {
+				candidates = append(candidates, name)
+			} else {
+				candidates = append(candidates, dir+"/"+name)
+			}
+		}
+	}
+	var content, found string
+	for _, c := range candidates {
+		got, err := fetch(c)
+		if errors.Is(err, errFileNotFound) {
+			continue
+		}
+		if err != nil {
+			return "", fmt.Errorf("field %q: fetching %s: %w", field.Name, c, err)
+		}
+		content, found = got, c
+		break
+	}
+	if found == "" {
+		if field.Optional {
+			return "", nil
+		}
+		where := file
+		if field.SearchParents {
+			where = pathpkg.Base(file) + " in " + pathpkg.Dir(file) + " or any folder above it"
+		}
+		return "", fmt.Errorf("field %q: couldn't find %s", field.Name, where)
 	}
 
 	match := re.FindStringSubmatch(content)
 	if match == nil {
-		return "", fmt.Errorf("field %q: pattern %q did not match anything in %s", field.Name, field.Pattern, path)
+		if field.Optional {
+			return "", nil
+		}
+		return "", fmt.Errorf("field %q: pattern %q did not match anything in %s", field.Name, field.Pattern, found)
 	}
 	return match[1], nil
 }
