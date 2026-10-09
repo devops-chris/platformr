@@ -42,6 +42,11 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 		return promptInput(label, field)
 	}
 
+	// Nothing to pick from, and the question only matters when there is: skip it.
+	if len(options) == 0 && field.SkipIfEmpty {
+		return "", nil
+	}
+
 	// Nothing to pick from — go straight to a plain prompt instead of forcing a
 	// select with a single "[+ enter manually]" entry and no other way out. This
 	// also applies when AllowManual is set: a list of exactly one forced choice

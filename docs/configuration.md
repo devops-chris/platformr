@@ -699,6 +699,21 @@ strip_suffix  = "-accounts"               # "ortho-tops-accounts" is shown as "o
 exclude       = ["pt-corp", "pt-security"] # never offer these (compared after stripping)
 ```
 
+A dynamic select that only applies to some cases can skip itself: with
+`skip_if_empty = true`, it isn't asked at all when there's nothing to list, and its
+value is `""`. For example, an "Environment" question that lists environment folders,
+which most accounts don't have:
+
+```toml
+[[resources.fields]]
+name          = "env_folder"
+type          = "select"
+label         = "Environment"
+source        = "dirs:cloud/aws/{{.account}}"
+exclude       = ["global", "bootstrap", "use1", "usw2"]
+skip_if_empty = true
+```
+
 ### Dynamic select — `source = "dirs:<path>"`
 
 Lists subdirectory names at a static path in the IaC repo at request time.

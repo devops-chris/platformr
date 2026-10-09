@@ -178,6 +178,7 @@ type Field struct {
 	FilterSuffix string   `toml:"filter_suffix"` // only include options that end with this suffix
 	StripSuffix  string   `toml:"strip_suffix"`  // remove this suffix from dynamically sourced option values
 	Exclude      []string `toml:"exclude"`       // leave these out of the options (after stripping)
+	SkipIfEmpty  bool     `toml:"skip_if_empty"` // a dynamic select with nothing to list isn't asked at all; its value is ""
 	When         string   `toml:"when"`          // Go template expression — field is skipped when result is not "true"
 	// Pattern is a regex with exactly one capture group, used by type = "file_lookup"
 	// to extract a value out of the file at Source. No prompt is shown; a fetch
