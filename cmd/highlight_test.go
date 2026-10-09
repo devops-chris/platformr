@@ -30,3 +30,14 @@ func TestHighlightRespectsNoColor(t *testing.T) {
 		t.Errorf("NO_COLOR should leave text alone, got %q", got)
 	}
 }
+
+func TestThemeName(t *testing.T) {
+	t.Setenv("PLATFORMR_THEME", "Nord")
+	if themeName() != "nord" {
+		t.Errorf("override: %s", themeName())
+	}
+	t.Setenv("PLATFORMR_THEME", "not-a-theme")
+	if n := themeName(); n != "github" && n != "github-dark" {
+		t.Errorf("unknown theme should fall back to GitHub, got %s", n)
+	}
+}

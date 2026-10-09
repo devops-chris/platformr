@@ -69,8 +69,9 @@ platformr auth
 # Make a request
 platformr request
 
-# Preview what a request would render — no PR opened (syntax-highlighted;
-# NO_COLOR=1 turns colors off, FORCE_COLOR=1 keeps them when piping)
+# Preview what a request would render — no PR opened (syntax-highlighted with GitHub's
+# theme; PLATFORMR_THEME=nord etc. to change it, NO_COLOR=1 to turn colors off,
+# FORCE_COLOR=1 to keep them when piping)
 platformr request vpc --dry-run
 
 # See what's available
