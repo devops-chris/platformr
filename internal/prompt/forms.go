@@ -30,6 +30,8 @@ func PromptField(field config.Field, values map[string]string, ctx *FieldContext
 	switch field.Type {
 	case "select", "reviewer", "team_reviewer":
 		return promptSelect(label, field, ctx)
+	case "multiselect":
+		return promptMultiSelect(label, field, ctx)
 	default:
 		return promptInput(label, field)
 	}
@@ -175,6 +177,73 @@ func resolveOptions(field config.Field, ctx *FieldContext) ([]string, error) {
 		names = kept
 	}
 	return names, nil
+}
+
+// promptMultiSelect asks for any number of options from the same sources as a select.
+// Options named in field.Default (comma-separated) start ticked. The answer is the
+// ticked options joined with commas, in list order, e.g. "DevOps,Engineering";
+// templates loop over it with split. At least one is required unless optional.
+func promptMultiSelect(label string, field config.Field, ctx *FieldContext) (string, error) {
+	options, err := resolveOptions(field, ctx)
+	if err != nil {
+		return "", err
+	}
+	if len(options) == 0 {
+		if field.SkipIfEmpty || field.Optional {
+			return "", nil
+		}
+		return "", fmt.Errorf("%s: there's nothing to choose from", label)
+	}
+	var picked []string
+	ms := huh.NewMultiSelect[string]().
+		Title(label).
+		Description("Space to tick or untick, Enter when done").
+		Options(multiOptions(options, field.Default)...).
+		Value(&picked)
+	if !field.Optional {
+		ms = ms.Validate(func(v []string) error {
+			if len(v) == 0 {
+				return fmt.Errorf("pick at least one")
+			}
+			return nil
+		})
+	}
+	ms.WithTheme(ui.Theme())
+	if err := ms.Run(); err != nil {
+		return "", err
+	}
+	return joinInOrder(options, picked), nil
+}
+
+// multiOptions builds the checklist, ticking the options listed in defaults.
+func multiOptions(options []string, defaults string) []huh.Option[string] {
+	want := map[string]bool{}
+	for _, d := range strings.Split(defaults, ",") {
+		if d = strings.TrimSpace(d); d != "" {
+			want[d] = true
+		}
+	}
+	opts := make([]huh.Option[string], len(options))
+	for i, o := range options {
+		opts[i] = huh.NewOption(o, o).Selected(want[o])
+	}
+	return opts
+}
+
+// joinInOrder joins the picked options in the order they're listed, so the stored
+// answer doesn't depend on the order they were ticked.
+func joinInOrder(options, picked []string) string {
+	got := map[string]bool{}
+	for _, p := range picked {
+		got[p] = true
+	}
+	var out []string
+	for _, o := range options {
+		if got[o] {
+			out = append(out, o)
+		}
+	}
+	return strings.Join(out, ",")
 }
 
 func toHuhOptions(vals []string) []huh.Option[string] {

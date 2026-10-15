@@ -160,7 +160,7 @@ type TemplateFileConfig struct {
 
 type Field struct {
 	Name  string `toml:"name"`
-	Type  string `toml:"type"`  // "input", "select", "computed", "reviewer", "team_reviewer", or "file_lookup"
+	Type  string `toml:"type"`  // "input", "select", "multiselect", "computed", "reviewer", "team_reviewer", or "file_lookup"
 	Value string `toml:"value"` // Go template expression for computed fields
 	Label string `toml:"label"`
 	// Source is a dynamic-value directive whose meaning depends on Type:

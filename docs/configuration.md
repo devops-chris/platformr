@@ -611,6 +611,7 @@ worth flagging, which is usually the most useful thing to read first.
 |---|---|
 | `input` | Free-text input. Supports `default`, `placeholder`, `validate`, and `optional`. |
 | `select` | Dropdown. Populated from `options` (static) or `source` (dynamic). Supports `optional`, `allow_manual`. |
+| `multiselect` | Checklist: pick any number. Same option sources as `select` (`options`, `source`, `list`). `default` names the options ticked at the start (comma-separated). The answer is the ticked options joined with commas, e.g. `DevOps,Engineering`. |
 | `computed` | No prompt — derives its value from a Go template expression. See [Computed fields](#computed-fields). |
 | `file_lookup` | No prompt — fetches a real file from this repo and extracts a value via regex. See [file_lookup fields](#file_lookup-fields--derive-a-value-from-a-real-file-not-a-duplicate). |
 | `reviewer` / `team_reviewer` | Like `select`, but the chosen value is also added to the PR's reviewers. See [Selectable reviewers](#selectable-reviewers-developer-chosen). |
@@ -652,6 +653,29 @@ type        = "input"
 label       = "VPC CIDR block"
 placeholder = "10.0.0.0/16"   # pre-filled; press Enter to accept
 ```
+
+### Multiple choices — `type = "multiselect"`
+
+A checklist for questions with more than one answer, such as which groups get access.
+The answer is stored comma-separated, so templates loop over it with `split`:
+
+```toml
+[[resources.fields]]
+name        = "groups"
+type        = "multiselect"
+label       = "Which groups get access?"
+list        = "locals.twingate_groups"            # or options = [...] / source = "dirs:..."
+update_file = "cloud/aws/_common/twingate-groups.hcl"
+default     = "DevOps,Engineering"                # ticked to start with
+```
+
+```hcl
+# in a template
+group_names = [{{range $i, $g := split "," .groups}}{{if $i}}, {{end}}"{{$g}}"{{end}}]
+```
+
+At least one must be ticked unless `optional = true`. With `skip_if_empty = true` it
+isn't asked when there's nothing to list.
 
 ### Static select
 
