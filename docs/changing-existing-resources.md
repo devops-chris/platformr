@@ -33,6 +33,7 @@ A change request names **a file** and **where in it**:
 [[resources]]
 name         = "eks-upgrade"
 category     = "EKS"
+action       = "change"                            # listed under "Change an existing one"
 display_name = "Upgrade cluster version"
 update_file  = 'clusters/{{.name}}/main.tf'        # which file
 

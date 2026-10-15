@@ -508,24 +508,67 @@ description  = "Create a new platform project"
 
 ---
 
-## Resource categories
+## The request menu: categories and actions
 
-Resources can be grouped with `category` for a tidier picker and catalog:
+The menu asks about the **thing** first, then whether you're making a new one or
+changing one that's already there, then which request:
 
-```toml
-[[resources]]
-name        = "vpc"
-category    = "Infrastructure"
-description = "Request a new VPC"
-
-[[resources]]
-name        = "scale-nodes"
-category    = "2nd Day Operations"
-description = "Scale a node group"
+```
+? What do you need?
+  > Network         VPC and remote access into it
+    Kubernetes      EKS clusters
+    Platform team   Accounts and account-wide setup
+? Kubernetes: what do you want to do?
+  > Create a new one
+    Change an existing one
+? Kubernetes: change an existing one
+  > Upgrade its Kubernetes version
+    Scale its node group
 ```
 
-Resources without `category` are grouped under **General**.
-Both `platformr request` and `platformr catalog` group and label by category.
+Any step with only one choice is skipped, so a small catalog stays a short menu.
+The second question only appears when a category has both kinds of request.
+
+Three settings drive it, all optional:
+
+```toml
+# platformr.toml — the menu order and a one-line hint per category
+[[categories]]
+name        = "Network"
+description = "VPC and remote access into it"
+
+[[categories]]
+name        = "Kubernetes"
+description = "EKS clusters"
+
+# any request file
+[[resources]]
+name     = "eks"
+category = "Kubernetes"          # which group it's in
+
+[[resources]]
+name     = "eks-upgrade"
+category = "Kubernetes"
+action   = "change"              # changes something that exists; leave out for "create"
+```
+
+| Setting | Where | Default |
+|---|---|---|
+| `category` | each request | **General** (listed last) |
+| `action` | each request | `"create"`; the other value is `"change"` |
+| `[[categories]]` | `platformr.toml` only | categories appear in the order their requests are defined, with no hint |
+
+A category used by a request but missing from `[[categories]]` still shows,
+after the listed ones. A listed category with no requests is hidden.
+Within each list, requests appear in the order they're defined.
+
+`action` only sorts the menu. What a request actually does still comes from
+its settings (templates for new files, `update_file` for changes; see
+[Change requests](#change-requests-editing-existing-files)). Nothing deletes:
+removing a resource stays a hand-made PR.
+
+`platformr catalog` uses the same order and splits each category into
+"Create a new one" and "Change an existing one".
 
 ---
 

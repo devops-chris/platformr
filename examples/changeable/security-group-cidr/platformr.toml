@@ -3,6 +3,7 @@
 [[resources]]
 name         = "sg-allow-ip"
 category     = "Network"
+action       = "change"
 display_name = "Allow an IP"
 update_file  = "network/security-groups.tf"
 pr_title     = 'feat(network): allow {{.cidr}} on HTTPS'
@@ -22,6 +23,7 @@ pr_title     = 'feat(network): allow {{.cidr}} on HTTPS'
 [[resources]]
 name         = "sg-remove-ip"
 category     = "Network"
+action       = "change"
 display_name = "Remove an IP"
 update_file  = "network/security-groups.tf"
 pr_title     = 'chore(network): remove {{.cidr}} from HTTPS'

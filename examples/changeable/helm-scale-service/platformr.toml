@@ -2,6 +2,7 @@
 [[resources]]
 name         = "service-scale"
 category     = "Service"
+action       = "change"
 display_name = "Scale service"
 update_file  = 'apps/{{.name}}/values.yaml'
 pr_title     = 'chore({{.name}}): scale to {{.replicas}} replicas'

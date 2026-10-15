@@ -35,6 +35,7 @@ and formatting stay as they were.
 [[resources]]
 name         = "service-scale"
 category     = "Service"
+action       = "change"
 display_name = "Scale service"
 update_file  = 'apps/{{.name}}/values.yaml'
 
@@ -100,6 +101,7 @@ This request changes:
 [[resources]]
 name         = "eks-upgrade"
 category     = "EKS"
+action       = "change"
 display_name = "Upgrade cluster version"
 update_file  = 'clusters/{{.name}}/main.tf'
 
@@ -138,6 +140,7 @@ longer on the list, so it can be kept as it is.
 [[resources]]
 name         = "sg-allow-ip"
 category     = "Network"
+action       = "change"
 display_name = "Allow an IP"
 update_file  = "network/security-groups.tf"
 
@@ -155,6 +158,7 @@ update_file  = "network/security-groups.tf"
 [[resources]]
 name         = "sg-remove-ip"
 category     = "Network"
+action       = "change"
 display_name = "Remove an IP"
 update_file  = "network/security-groups.tf"
 
@@ -199,6 +203,7 @@ update_file  = "network/security-groups.tf"
 [[resources]]
 name         = "iam-add-action"
 category     = "IAM"
+action       = "change"
 display_name = "Add a permission"
 update_file  = 'policies/{{.policy}}.json'
 

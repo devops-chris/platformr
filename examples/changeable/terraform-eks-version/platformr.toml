@@ -2,6 +2,7 @@
 [[resources]]
 name         = "eks-upgrade"
 category     = "EKS"
+action       = "change"
 display_name = "Upgrade cluster version"
 update_file  = 'clusters/{{.name}}/main.tf'
 pr_title     = 'chore(eks): upgrade {{.name}} to {{.cluster_version}}'

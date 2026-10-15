@@ -2,6 +2,7 @@
 [[resources]]
 name         = "iam-add-action"
 category     = "IAM"
+action       = "change"
 display_name = "Add a permission"
 update_file  = 'policies/{{.policy}}.json'
 pr_title     = 'feat(iam): allow {{.action}} in {{.policy}}'

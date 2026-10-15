@@ -35,7 +35,7 @@ func (r *RepoConfig) AddRequestFile(path, content string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
-	for _, key := range []string{"defaults", "requests_dir"} {
+	for _, key := range []string{"defaults", "requests_dir", "categories"} {
 		if md.IsDefined(key) {
 			return fmt.Errorf("%s: %q can only be set in platformr.toml, not in a request file", path, key)
 		}
@@ -51,6 +51,9 @@ func (r *RepoConfig) AddRequestFile(path, content string) error {
 	for _, res := range f.Resources {
 		if res.Name == "" {
 			return fmt.Errorf("%s: a [[resources]] block has no name", path)
+		}
+		if res.Action != "" && res.Action != "create" && res.Action != "change" {
+			return fmt.Errorf("%s: request %q has action = %q — use \"create\" (the default) or \"change\"", path, res.Name, res.Action)
 		}
 		if existing[res.Name] {
 			return fmt.Errorf("%s: a request named %q already exists (in platformr.toml or another request file) — names must be unique", path, res.Name)

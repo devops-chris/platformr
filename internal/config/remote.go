@@ -51,9 +51,11 @@ type RepoConfig struct {
 	// [[resources]] (and optionally [maps]) exactly as they'd be written here.
 	// Lets a repo with many requests keep one file per thing instead of one huge
 	// platformr.toml. Defaults to DefaultRequestsDir; a missing folder is fine.
-	RequestsDir string           `toml:"requests_dir"`
-	Defaults    ResourceDefaults `toml:"defaults"`
-	Resources   []Resource       `toml:"resources"`
+	RequestsDir string `toml:"requests_dir"`
+	// Categories sets the request menu's order and one-line hints (optional).
+	Categories []CategoryConfig `toml:"categories"`
+	Defaults   ResourceDefaults `toml:"defaults"`
+	Resources  []Resource       `toml:"resources"`
 	// Maps defines named lookup tables available in templates via {{index .maps.<name> <key>}}.
 	// Useful for mapping computed values (e.g. account name → AWS account ID) without prompting.
 	Maps map[string]map[string]string `toml:"maps"`
@@ -67,6 +69,7 @@ type Resource struct {
 	Name             string               `toml:"name"`
 	DisplayName      string               `toml:"display_name"` // optional friendly name shown in picker and catalog; name is still used for CLI args
 	Category         string               `toml:"category"`     // optional grouping label shown in picker and catalog
+	Action           string               `toml:"action"`       // "create" (default) or "change": changes something that already exists
 	Description      string               `toml:"description"`
 	Template         string               `toml:"template"`           // path within this repo, e.g. "platformr/templates/service.yaml.tmpl"
 	TemplateDir      string               `toml:"template_dir"`       // directory of .tmpl files — all rendered and committed (takes precedence over template)

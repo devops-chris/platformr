@@ -101,7 +101,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		resource = found
 	} else {
 		var err error
-		resource, err = pickResource(allResources)
+		resource, err = pickResource(allResources, remote.AllCategories(repos))
 		if err != nil {
 			return err
 		}
@@ -394,63 +394,60 @@ func withAuthHint(err error, binaryName string) error {
 	return err
 }
 
-func pickResource(allResources []config.Resource) (config.Resource, error) {
-	// Collect unique categories in first-seen order.
-	seen := map[string]bool{}
-	var categories []string
-	for _, r := range allResources {
-		cat := r.Category
-		if cat == "" {
-			cat = "General"
+// pickResource walks the menu: the thing (category), then "create or change" when that
+// category has both, then the request. Any step with a single choice is skipped.
+func pickResource(allResources []config.Resource, categories []config.CategoryConfig) (config.Resource, error) {
+	cats := config.MenuCategories(allResources, categories)
+
+	category := cats[0].Name
+	if len(cats) > 1 {
+		opts := make([]huh.Option[string], len(cats))
+		for i, c := range cats {
+			hint := c.Description
+			if hint == "" {
+				creates, changes := config.InMenuOrder(allResources, c.Name)
+				hint = fmt.Sprintf("%d request(s)", len(creates)+len(changes))
+			}
+			opts[i] = huh.NewOption(ui.PickerItem(c.Name, hint), c.Name)
 		}
-		if !seen[cat] {
-			seen[cat] = true
-			categories = append(categories, cat)
+		sel := huh.NewSelect[string]().
+			Title("What do you need?").
+			Options(opts...).
+			Value(&category)
+		sel.WithTheme(ui.Theme())
+		if err := sel.Run(); err != nil {
+			return config.Resource{}, err
 		}
 	}
 
-	// No categories or only one — skip category step entirely.
-	if len(categories) <= 1 {
-		desc := "Select a resource type"
-		if len(categories) == 1 {
-			desc = categories[0]
+	creates, changes := config.InMenuOrder(allResources, category)
+	list, title := creates, category+": create a new one"
+	switch {
+	case len(creates) > 0 && len(changes) > 0:
+		const create, change = "create", "change"
+		kind := create
+		sel := huh.NewSelect[string]().
+			Title(category+": what do you want to do?").
+			Options(
+				huh.NewOption(ui.PickerItem("Create a new one", ""), create),
+				huh.NewOption(ui.PickerItem("Change an existing one", "update something already there"), change),
+			).
+			Value(&kind)
+		sel.WithTheme(ui.Theme())
+		if err := sel.Run(); err != nil {
+			return config.Resource{}, err
 		}
-		return pickFromList("What would you like to request?", desc, allResources)
+		if kind == change {
+			list, title = changes, category+": change an existing one"
+		}
+	case len(creates) == 0:
+		list, title = changes, category+": change an existing one"
 	}
 
-	// Step 1: pick a category.
-	catOpts := make([]huh.Option[string], len(categories))
-	for i, cat := range categories {
-		count := len(resourcesInCategory(allResources, cat))
-		catOpts[i] = huh.NewOption(ui.CategoryOption(cat, count), cat)
+	if len(list) == 1 {
+		return list[0], nil
 	}
-	var selectedCat string
-	catSel := huh.NewSelect[string]().
-		Title("What type of resource?").
-		Description("Select a category").
-		Options(catOpts...).
-		Value(&selectedCat)
-	catSel.WithTheme(ui.Theme())
-	if err := catSel.Run(); err != nil {
-		return config.Resource{}, err
-	}
-
-	// Step 2: pick resource within that category.
-	return pickFromList("What would you like to request?", selectedCat, resourcesInCategory(allResources, selectedCat))
-}
-
-func resourcesInCategory(all []config.Resource, cat string) []config.Resource {
-	var result []config.Resource
-	for _, r := range all {
-		rc := r.Category
-		if rc == "" {
-			rc = "General"
-		}
-		if rc == cat {
-			result = append(result, r)
-		}
-	}
-	return result
+	return pickFromList(title, "", list)
 }
 
 func pickFromList(title, description string, resources []config.Resource) (config.Resource, error) {

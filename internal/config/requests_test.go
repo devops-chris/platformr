@@ -85,6 +85,8 @@ func TestAddRequestFileRejectsProblemsAndAddsNothing(t *testing.T) {
 		"map already in root":    {"[maps.sizes]\nx = \"y\"\n[[resources]]\nname = \"a\"\n", `map named "sizes" already exists`},
 		"defaults in a file":     {"[defaults]\nbase_branch = \"main\"\n[[resources]]\nname = \"a\"\n", `"defaults" can only be set in platformr.toml`},
 		"requests_dir in a file": {"requests_dir = \"x\"\n[[resources]]\nname = \"a\"\n", `"requests_dir" can only be set in platformr.toml`},
+		"categories in a file":   {"[[categories]]\nname = \"x\"\n[[resources]]\nname = \"a\"\n", `"categories" can only be set in platformr.toml`},
+		"unknown action":         {"[[resources]]\nname = \"a\"\naction = \"update\"\n", `use "create" (the default) or "change"`},
 		"no requests":            {"[maps.x]\na = \"b\"\n", "no [[resources]] found"},
 		"missing name":           {"[[resources]]\ndescription = \"x\"\n", "has no name"},
 		"syntax error":           {"[[resources]]\nname = \"a\n", "line 2"},

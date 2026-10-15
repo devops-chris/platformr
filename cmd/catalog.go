@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/charmbracelet/huh/spinner"
@@ -73,12 +72,12 @@ func runCatalog(cmd *cobra.Command, args []string) error {
 	if catalogJSON {
 		return printAllJSON(allResources)
 	}
-	return printResourceList(allResources)
+	return printResourceList(allResources, remote.AllCategories(repos))
 }
 
 // ── List view ────────────────────────────────────────────────────────────────
 
-func printResourceList(resources []config.Resource) error {
+func printResourceList(resources []config.Resource, categories []config.CategoryConfig) error {
 	nameStyle := lipgloss.NewStyle().Bold(true)
 	binaryName := filepath.Base(os.Args[0])
 
@@ -87,63 +86,51 @@ func printResourceList(resources []config.Resource) error {
 		ui.Subtle(localCfg.ConnectedOrg),
 	)
 
-	// Only show category headers if at least one resource has a category set.
-	hasCategories := false
-	for _, r := range resources {
-		if r.Category != "" {
-			hasCategories = true
-			break
-		}
-	}
-
-	// Sort by category so same-category resources from multiple repos are adjacent.
-	sorted := make([]config.Resource, len(resources))
-	copy(sorted, resources)
-	if hasCategories {
-		sort.SliceStable(sorted, func(i, j int) bool {
-			ci, cj := sorted[i].Category, sorted[j].Category
-			if ci == "" {
-				ci = "General"
-			}
-			if cj == "" {
-				cj = "General"
-			}
-			return ci < cj
-		})
-	}
-
 	// Compute max label width for consistent description column alignment.
 	maxLabelWidth := 0
-	for _, r := range sorted {
+	for _, r := range resources {
 		if w := len(r.Label()); w > maxLabelWidth {
 			maxLabelWidth = w
 		}
 	}
+	printGroup := func(heading string, list []config.Resource) {
+		if len(list) == 0 {
+			return
+		}
+		if heading != "" {
+			fmt.Printf("    %s\n", ui.Subtle(heading))
+		}
+		for _, r := range list {
+			slug := ""
+			if r.DisplayName != "" {
+				slug = "  " + ui.Subtle("("+r.Name+")")
+			}
+			fmt.Printf("    %s%s  %s\n",
+				nameStyle.Render(fmt.Sprintf("%-*s", maxLabelWidth, r.Label())),
+				slug,
+				ui.Subtle(r.Description),
+			)
+		}
+	}
 
-	currentCategory := ""
-	for _, r := range sorted {
-		if hasCategories {
-			cat := r.Category
-			if cat == "" {
-				cat = "General"
+	cats := config.MenuCategories(resources, categories)
+	for i, c := range cats {
+		creates, changes := config.InMenuOrder(resources, c.Name)
+		if len(cats) > 1 {
+			if i > 0 {
+				fmt.Println()
 			}
-			if cat != currentCategory {
-				if currentCategory != "" {
-					fmt.Println()
-				}
-				currentCategory = cat
-				fmt.Printf("  %s\n\n", ui.SectionHeader(cat))
-			}
+			fmt.Printf("  %s  %s\n\n", ui.SectionHeader(c.Name), ui.Subtle(c.Description))
 		}
-		slug := ""
-		if r.DisplayName != "" {
-			slug = "  " + ui.Subtle("("+r.Name+")")
+		if len(changes) == 0 {
+			printGroup("", creates)
+			continue
 		}
-		fmt.Printf("    %s%s  %s\n",
-			nameStyle.Render(fmt.Sprintf("%-*s", maxLabelWidth, r.Label())),
-			slug,
-			ui.Subtle(r.Description),
-		)
+		printGroup("Create a new one", creates)
+		if len(creates) > 0 {
+			fmt.Println()
+		}
+		printGroup("Change an existing one", changes)
 	}
 
 	fmt.Printf("\n  %s\n\n",

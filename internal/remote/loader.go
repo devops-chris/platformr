@@ -83,6 +83,15 @@ func AllResources(repos []*config.RepoConfig) []config.Resource {
 	return all
 }
 
+// AllCategories joins every repo's [[categories]] list, in repo order.
+func AllCategories(repos []*config.RepoConfig) []config.CategoryConfig {
+	var all []config.CategoryConfig
+	for _, repo := range repos {
+		all = append(all, repo.Categories...)
+	}
+	return all
+}
+
 // MapsFor returns the named maps defined in the repo that owns the given resource.
 func MapsFor(resource config.Resource, repos []*config.RepoConfig) map[string]map[string]string {
 	for _, repo := range repos {
