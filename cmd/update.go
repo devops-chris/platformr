@@ -24,8 +24,14 @@ type updateSession struct {
 	repo   string
 	branch string
 	// fetch and exists read the target repo's base branch (swapped out in tests).
-	fetch    func(path string) (string, error)
-	exists   func(path string) (bool, error)
+	fetch  func(path string) (string, error)
+	exists func(path string) (bool, error)
+	// fetchRef reads from the ref the request's config came from (--ref / org config
+	// ref), when it differs from the base branch. Used only for files that aren't on
+	// the base branch yet and are only read, never changed (e.g. a list to pick from).
+	fetchRef func(path string) (string, error)
+	refName  string
+	fromRef  map[string]bool
 	maps     map[string]map[string]string
 	docs     map[string]edit.Doc
 	original map[string][]byte
@@ -38,9 +44,22 @@ var errFileNotFound = errors.New("file not found")
 
 func newUpdateSession(gh *ghclient.Client, resource config.Resource, maps map[string]map[string]string) *updateSession {
 	repo, branch := resource.Resolved.Repo, resource.Resolved.BaseBranch
+	ref := resource.Resolved.TemplateRef
+	var fetchRef func(string) (string, error)
+	if ref != "" && ref != branch {
+		fetchRef = func(path string) (string, error) {
+			c, err := gh.FetchFile(resource.Resolved.TemplateRepo, path, ref)
+			if ghclient.IsNotFound(err) {
+				return "", errFileNotFound
+			}
+			return c, err
+		}
+	}
 	return &updateSession{
-		repo:   repo,
-		branch: branch,
+		fetchRef: fetchRef,
+		refName:  ref,
+		repo:     repo,
+		branch:   branch,
 		fetch: func(path string) (string, error) {
 			c, err := gh.FetchFile(repo, path, branch)
 			if ghclient.IsNotFound(err) {
@@ -49,6 +68,7 @@ func newUpdateSession(gh *ghclient.Client, resource config.Resource, maps map[st
 			return c, err
 		},
 		exists:   func(path string) (bool, error) { return gh.FileExists(repo, path, branch) },
+		fromRef:  map[string]bool{},
 		maps:     maps,
 		docs:     map[string]edit.Doc{},
 		original: map[string][]byte{},
@@ -73,6 +93,17 @@ func (u *updateSession) open(path, format string, key any) (edit.Doc, error) {
 		return nil, err
 	}
 	content, err := u.fetch(path)
+	if errors.Is(err, errFileNotFound) && u.fetchRef != nil {
+		// Not on the base branch yet, but maybe on the ref being tried (--ref): fine to
+		// read from there. apply() refuses to change it, since the PR targets the base.
+		if c, rerr := u.fetchRef(path); rerr == nil {
+			content, err = c, nil
+			if u.fromRef == nil {
+				u.fromRef = map[string]bool{}
+			}
+			u.fromRef[path] = true
+		}
+	}
 	if err != nil {
 		if errors.Is(err, errFileNotFound) {
 			return nil, fmt.Errorf("%s doesn't exist in %s (%s branch) — check what was picked, or the request's update_file", path, u.repo, u.branch)
@@ -271,6 +302,9 @@ func (u *updateSession) apply(resource config.Resource, values map[string]string
 	var files []ghclient.PRFile
 	for _, path := range u.order {
 		if b := u.docs[path].Bytes(); !bytes.Equal(b, u.original[path]) {
+			if u.fromRef[path] {
+				return nil, nil, fmt.Errorf("%s only exists on %s, not on %s yet, so this request can't change it: merge %s first", path, u.refName, u.branch, u.refName)
+			}
 			files = append(files, ghclient.PRFile{Path: path, Content: string(b)})
 		}
 	}

@@ -297,3 +297,26 @@ func TestAppendIfExistsSkip(t *testing.T) {
 		t.Errorf("new item should still be added: %v %v", files, err)
 	}
 }
+
+func TestReadFromRefWhenNotOnBase(t *testing.T) {
+	r, sess := testRequest(t, "sg-allow-ip")
+	refFiles := map[string]string{"lists/groups.hcl": "locals {\n  groups = [\"DevOps\", \"Engineering\"]\n}\n"}
+	sess.refName = "my-branch"
+	sess.fetchRef = func(p string) (string, error) {
+		if c, ok := refFiles[p]; ok {
+			return c, nil
+		}
+		return "", errFileNotFound
+	}
+	// Read-only: a list only on the branch is offered.
+	f, err := sess.prepareField(config.Field{Name: "g", Type: "multiselect", List: "locals.groups", UpdateFile: "lists/groups.hcl"}, r, map[string]string{})
+	if err != nil || strings.Join(f.Options, ",") != "DevOps,Engineering" {
+		t.Fatalf("options %v err %v", f.Options, err)
+	}
+	// Changing it is refused with a clear message.
+	r.Changes = []config.ChangeConfig{{Action: "append", Key: "locals.groups", Item: "Data", File: "lists/groups.hcl"}}
+	_, _, err = sess.apply(r, map[string]string{"cidr": "203.0.113.10/32"})
+	if err == nil || !strings.Contains(err.Error(), "only exists on my-branch") {
+		t.Errorf("want refusal, got %v", err)
+	}
+}
