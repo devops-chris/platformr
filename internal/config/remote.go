@@ -7,6 +7,9 @@ type OrgConfig struct {
 	Defaults ResourceDefaults `toml:"defaults"`
 	Repos    []RepoRef        `toml:"repos"`
 	Branding BrandingConfig   `toml:"branding"`
+	// Categories is the request menu for the whole org: its order and one-line hints.
+	// The menu spans every repo, so this is its home; see MenuCategories.
+	Categories []CategoryConfig `toml:"categories"`
 }
 
 type OrgGitHubConfig struct {

@@ -71,12 +71,13 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch all resource definitions from registered IaC repos
+	var orgCfg *config.OrgConfig
 	var repos []*config.RepoConfig // this is resolved in the spinner
 	var loadErr error
 	_ = spinner.New().
 		Title("Loading resources...").
 		Action(func() {
-			_, repos, loadErr = loader.LoadAll(localCfg.ConnectedOrg)
+			orgCfg, repos, loadErr = loader.LoadAll(localCfg.ConnectedOrg)
 		}).
 		Run()
 
@@ -101,7 +102,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		resource = found
 	} else {
 		var err error
-		resource, err = pickResource(allResources, remote.AllCategories(repos))
+		resource, err = pickResource(allResources, remote.AllCategories(orgCfg, repos))
 		if err != nil {
 			return err
 		}

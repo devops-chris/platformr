@@ -19,7 +19,8 @@ That's it. Everything else is fetched from GitHub at runtime.
 ## 2. Org config — `<org>/.platformr/config.toml`
 
 Lives in a repo named `.platformr` inside your GitHub org (e.g. `github.com/acme-corp/.platformr`).
-The platform team owns this file. It tells platformr which IaC repos to discover resources from.
+The platform team owns this file. It tells platformr which IaC repos to discover resources
+from, and holds the request menu, since the menu spans all of them.
 
 ```toml
 [github]
@@ -37,7 +38,26 @@ url = "terraform-infra"          # resolves to acme-corp/terraform-infra
 
 [[repos]]
 url = "other-org/shared-infra"   # explicit — different org, same GitHub instance
+
+# The request menu: its order and a one-line hint per category.
+# See "The request menu" below.
+[[categories]]
+name        = "Network"
+description = "VPC and remote access into it"
 ```
+
+### Where everything lives
+
+| What | Where | Owned by |
+|---|---|---|
+| Which repos platformr reads, the request menu | org config: `<org>/.platformr/config.toml` | platform team |
+| Shared settings for one repo: defaults, reusable fields, folders | that repo's `platformr.toml` | that repo's owners |
+| Requests | `platformr/requests/*.toml` in each repo | that repo's owners |
+| Templates | `platformr/templates/<request name>/` in each repo | that repo's owners |
+
+A request names its menu group with `category = "..."`; the group's order and hint
+come from the org config. A request in one repo can read facts from another
+connected repo with [`repo`](#repo-read-from-another-repo-the-repos-are-your-catalog).
 
 ### `ref` — fetch templates from a specific branch
 
@@ -543,7 +563,7 @@ The second question only appears when a category has both kinds of request.
 Three settings drive it, all optional:
 
 ```toml
-# platformr.toml — the menu order and a one-line hint per category
+# org config (.platformr/config.toml): the menu order and a one-line hint per category
 [[categories]]
 name        = "Network"
 description = "VPC and remote access into it"
@@ -567,10 +587,15 @@ action   = "change"              # changes something that exists; leave out for 
 |---|---|---|
 | `category` | each request | **General** (listed last) |
 | `action` | each request | `"create"`; the other value is `"change"` |
-| `[[categories]]` | `platformr.toml` only | categories appear in the order their requests are defined, with no hint |
+| `[[categories]]` | the org config | categories appear in the order their requests are defined, with no hint |
 
 A category used by a request but missing from `[[categories]]` still shows,
 after the listed ones. A listed category with no requests is hidden.
+
+The menu lives in the org config because it spans every connected repo: one place,
+next to the list of repos it draws from. A single-repo setup can put `[[categories]]`
+in that repo's `platformr.toml` instead; categories there are added after the org
+config's (a name already in the org config keeps the org config's order and hint).
 Within each list, requests appear in the order they're defined.
 
 `action` only sorts the menu. What a request actually does still comes from
@@ -667,7 +692,7 @@ worth flagging, which is usually the most useful thing to read first.
 | `select` | Dropdown. Populated from `options` (static) or `source` (dynamic). Supports `optional`, `allow_manual`. |
 | `multiselect` | Checklist: pick any number. Same option sources as `select` (`options`, `source`, `list`). `default` names the options ticked at the start (comma-separated). The answer is the ticked options joined with commas, e.g. `DevOps,Engineering`. |
 | `computed` | No prompt — derives its value from a Go template expression. See [Computed fields](#computed-fields). |
-| `file_lookup` | No prompt — fetches a real file from this repo and extracts a value via regex. See [file_lookup fields](#file_lookup-fields--derive-a-value-from-a-real-file-not-a-duplicate). |
+| `file_lookup` | No prompt — fetches a real file from this repo and extracts a value via regex. See [file_lookup fields](#file_lookup-fields-derive-a-value-from-a-real-file-not-a-duplicate). |
 | `reviewer` / `team_reviewer` | Like `select`, but the chosen value is also added to the PR's reviewers. See [Selectable reviewers](#selectable-reviewers-developer-chosen). |
 
 ### Optional fields

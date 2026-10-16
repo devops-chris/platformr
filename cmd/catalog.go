@@ -47,12 +47,13 @@ func runCatalog(cmd *cobra.Command, args []string) error {
 	token := resolveReadToken()
 	loader := remote.New(token)
 
+	var orgCfg *config.OrgConfig
 	var repos []*config.RepoConfig
 	var loadErr error
 	_ = spinner.New().
 		Title("Loading catalog...").
 		Action(func() {
-			_, repos, loadErr = loader.LoadAll(localCfg.ConnectedOrg)
+			orgCfg, repos, loadErr = loader.LoadAll(localCfg.ConnectedOrg)
 		}).
 		Run()
 
@@ -72,7 +73,7 @@ func runCatalog(cmd *cobra.Command, args []string) error {
 	if catalogJSON {
 		return printAllJSON(allResources)
 	}
-	return printResourceList(allResources, remote.AllCategories(repos))
+	return printResourceList(allResources, remote.AllCategories(orgCfg, repos))
 }
 
 // ── List view ────────────────────────────────────────────────────────────────

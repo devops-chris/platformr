@@ -83,9 +83,13 @@ func AllResources(repos []*config.RepoConfig) []config.Resource {
 	return all
 }
 
-// AllCategories joins every repo's [[categories]] list, in repo order.
-func AllCategories(repos []*config.RepoConfig) []config.CategoryConfig {
+// AllCategories is the menu's declared categories: the org config's [[categories]] first,
+// then any a repo's platformr.toml adds (handy for a single-repo setup), in repo order.
+func AllCategories(org *config.OrgConfig, repos []*config.RepoConfig) []config.CategoryConfig {
 	var all []config.CategoryConfig
+	if org != nil {
+		all = append(all, org.Categories...)
+	}
 	for _, repo := range repos {
 		all = append(all, repo.Categories...)
 	}
