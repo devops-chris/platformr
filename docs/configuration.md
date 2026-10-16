@@ -560,6 +560,10 @@ changing one that's already there, then which request:
 Any step with only one choice is skipped, so a small catalog stays a short menu.
 The second question only appears when a category has both kinds of request.
 
+From the second step on, the last choice is **← Back**, and **Esc** does the same:
+it returns to the previous step that was asked, starting on what was picked there.
+Ctrl+C quits.
+
 Three settings drive it, all optional:
 
 ```toml
@@ -1039,7 +1043,8 @@ repo    = "pt-devops-terraform"
 ```
 
 - `repo` is the repo's name (or `org/name`). It must be one of the org config's
-  `[[repos]]`; otherwise the request stops and says so.
+  `[[repos]]`; otherwise the request stops and says so. A repo that's only read from
+  doesn't need a `platformr.toml` of its own (`platformr doctor` notes it).
 - It's read at the same branch platformr loaded that repo's config from: its `ref` in the
   org config, or `--ref`.
 - Reading only. A request still opens its PR in its own repo.

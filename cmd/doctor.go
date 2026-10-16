@@ -151,7 +151,13 @@ func runDoctor(_ *cobra.Command, _ []string) error {
 		}
 		label := fmt.Sprintf("%s (ref: %s)", repoURL, refLabel)
 
-		if repo, ok := loaded[repoURL]; ok {
+		if repo, ok := loaded[repoURL]; ok && repo.NoConfig {
+			hint := "Fine if other repos' requests only read from it. If it should have requests, add platformr.toml"
+			if ref.Ref != "" {
+				hint += fmt.Sprintf(" (and check that ref %q exists and is pushed)", ref.Ref)
+			}
+			warn(label+" — no platformr.toml, no requests of its own", hint+".")
+		} else if ok {
 			count := len(repo.Resources)
 			noun := "resources"
 			if count == 1 {

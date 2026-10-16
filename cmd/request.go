@@ -398,85 +398,6 @@ func withAuthHint(err error, binaryName string) error {
 	return err
 }
 
-// pickResource walks the menu: the thing (category), then "create or change" when that
-// category has both, then the request. Any step with a single choice is skipped.
-func pickResource(allResources []config.Resource, categories []config.CategoryConfig) (config.Resource, error) {
-	cats := config.MenuCategories(allResources, categories)
-
-	category := cats[0].Name
-	if len(cats) > 1 {
-		opts := make([]huh.Option[string], len(cats))
-		for i, c := range cats {
-			hint := c.Description
-			if hint == "" {
-				creates, changes := config.InMenuOrder(allResources, c.Name)
-				hint = fmt.Sprintf("%d request(s)", len(creates)+len(changes))
-			}
-			opts[i] = huh.NewOption(ui.PickerItem(c.Name, hint), c.Name)
-		}
-		sel := huh.NewSelect[string]().
-			Title("What do you need?").
-			Options(opts...).
-			Value(&category)
-		sel.WithTheme(ui.Theme())
-		if err := sel.Run(); err != nil {
-			return config.Resource{}, err
-		}
-	}
-
-	creates, changes := config.InMenuOrder(allResources, category)
-	list, title := creates, category+": create a new one"
-	switch {
-	case len(creates) > 0 && len(changes) > 0:
-		const create, change = "create", "change"
-		kind := create
-		sel := huh.NewSelect[string]().
-			Title(category+": what do you want to do?").
-			Options(
-				huh.NewOption(ui.PickerItem("Create a new one", ""), create),
-				huh.NewOption(ui.PickerItem("Change an existing one", "update something already there"), change),
-			).
-			Value(&kind)
-		sel.WithTheme(ui.Theme())
-		if err := sel.Run(); err != nil {
-			return config.Resource{}, err
-		}
-		if kind == change {
-			list, title = changes, category+": change an existing one"
-		}
-	case len(creates) == 0:
-		list, title = changes, category+": change an existing one"
-	}
-
-	if len(list) == 1 {
-		return list[0], nil
-	}
-	return pickFromList(title, "", list)
-}
-
-func pickFromList(title, description string, resources []config.Resource) (config.Resource, error) {
-	opts := make([]huh.Option[string], len(resources))
-	for i, r := range resources {
-		opts[i] = huh.NewOption(ui.PickerItem(r.Label(), r.Description), r.Name)
-	}
-	var selected string
-	sel := huh.NewSelect[string]().
-		Title(title).
-		Description(description).
-		Options(opts...).
-		Value(&selected)
-	sel.WithTheme(ui.Theme())
-	if err := sel.Run(); err != nil {
-		return config.Resource{}, err
-	}
-	for _, r := range resources {
-		if r.Name == selected {
-			return r, nil
-		}
-	}
-	return config.Resource{}, fmt.Errorf("resource %q not found", selected)
-}
-
 func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, sess *updateSession) (map[string]string, error) {
 	values := make(map[string]string)
 
@@ -504,6 +425,14 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 			}
 			values[field.Name] = val
 			continue
+		}
+
+		// A list read from another repo: a repo that isn't connected is a config mistake;
+		// say so now rather than quietly turning the list into a text box.
+		if field.Repo != "" {
+			if _, _, err := sourceRepo(field, resource, repos); err != nil {
+				return nil, err
+			}
 		}
 
 		// default and placeholder can use earlier answers: default = "{{.current_version}}".

@@ -55,11 +55,16 @@ func (l *Loader) LoadAll(orgName string) (*config.OrgConfig, []*config.RepoConfi
 	for _, repoRef := range orgCfg.Repos {
 		repoURL := resolveRepoURL(repoRef.URL, orgCfg.GitHub.DefaultOrg)
 
-		repoCfg, err := l.loadRepoConfig(repoURL, refFor(repoRef.Ref))
+		ref := refFor(repoRef.Ref)
+		repoCfg, err := l.loadRepoConfig(repoURL, ref)
 		if err != nil {
-			// A repo without a platformr.toml just isn't set up yet — skip it quietly.
+			// A repo without a platformr.toml has no requests of its own, but other repos'
+			// requests can still read from it, so it stays in the list (quietly).
 			// Anything else (usually a typo) hides all of its requests, so say so.
-			if !github.IsNotFound(err) {
+			if github.IsNotFound(err) {
+				owner, _, _ := strings.Cut(repoURL, "/")
+				repos = append(repos, &config.RepoConfig{NoConfig: true, RepoName: repoURL, RepoOwner: owner, RepoRef: ref})
+			} else {
 				l.Warnings = append(l.Warnings, fmt.Sprintf(
 					"%s: platformr.toml couldn't be read, so none of its requests are shown. Fix it and try again.\n  %v", repoURL, err))
 			}

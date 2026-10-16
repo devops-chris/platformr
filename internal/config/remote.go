@@ -65,8 +65,11 @@ type RepoConfig struct {
 	Maps map[string]map[string]string `toml:"maps"`
 	// Set at load time from the repo URL, not from TOML.
 	RepoOwner string `toml:"-"`
-	RepoName  string `toml:"-"` // full "owner/repo"
-	RepoRef   string `toml:"-"` // git ref this config was fetched from (empty = default branch)
+	// NoConfig marks a listed repo with no platformr.toml: it has no requests of its own,
+	// but other repos' requests can still read from it (`repo = ...`).
+	NoConfig bool   `toml:"-"`
+	RepoName string `toml:"-"` // full "owner/repo"
+	RepoRef  string `toml:"-"` // git ref this config was fetched from (empty = default branch)
 }
 
 type Resource struct {
