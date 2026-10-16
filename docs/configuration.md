@@ -557,8 +557,11 @@ changing one that's already there, then which request:
     Scale its node group
 ```
 
-Any step with only one choice is skipped, so a small catalog stays a short menu.
-The second question only appears when a category has both kinds of request.
+The category step is skipped when there's only one category, and the second question
+only appears when a category has both kinds of request. The request list is always
+shown once an earlier step was asked, even with one request, so you see what you're
+starting and can go back. Once a request is picked, its name, menu group and
+description are shown above its questions.
 
 From the second step on, the last choice is **← Back**, and **Esc** does the same:
 it returns to the previous step that was asked, starting on what was picked there.

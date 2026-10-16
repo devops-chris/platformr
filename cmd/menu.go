@@ -24,8 +24,9 @@ type menuOption struct{ label, hint, value string }
 type askFunc func(title string, opts []menuOption, canBack bool, current string) (string, error)
 
 // pickResource walks the menu: the thing (category), then "create or change" when that
-// category has both, then the request. A step with a single choice is skipped. From the
-// second step on, "← Back" (or Esc) returns to the previous step that was asked.
+// category has both, then the request. The category and create/change steps are skipped
+// when there's only one choice; the request list is always shown once an earlier step was
+// asked. From the second step on, "← Back" (or Esc) returns to the previous step asked.
 func pickResource(all []config.Resource, categories []config.CategoryConfig) (config.Resource, error) {
 	return walkMenu(all, categories, askMenu)
 }
@@ -91,14 +92,18 @@ func walkMenu(all []config.Resource, categories []config.CategoryConfig, ask ask
 			if kind == change {
 				list, title = changes, category+": change an existing one"
 			}
-			if len(list) == 1 {
+			// A single request is still shown once an earlier step was asked, so the person
+			// sees what they're starting and can go back. Picked silently only when the
+			// whole menu is that one request.
+			canBack := askKind || askCategory
+			if len(list) == 1 && !canBack {
 				return list[0], nil
 			}
 			opts := make([]menuOption, len(list))
 			for i, r := range list {
 				opts[i] = menuOption{r.Label(), r.Description, r.Name}
 			}
-			v, err := ask(title, opts, askKind || askCategory, "")
+			v, err := ask(title, opts, canBack, "")
 			if errors.Is(err, errBack) {
 				if askKind {
 					step = 1
@@ -178,4 +183,18 @@ func (m *escGoesBack) View() string {
 		return ""
 	}
 	return m.form.View()
+}
+
+// requestHeader is printed above a request's questions so the person knows which
+// request they're in: its name, where it sits in the menu, and what it does.
+func requestHeader(r config.Resource) string {
+	kind := "new"
+	if r.IsChange() {
+		kind = "change"
+	}
+	h := "\n  " + ui.SectionHeader(r.Label()) + "  " + ui.Subtle(config.CategoryOf(r)+" · "+kind) + "\n"
+	if r.Description != "" {
+		h += "  " + ui.Subtle(r.Description) + "\n"
+	}
+	return h
 }

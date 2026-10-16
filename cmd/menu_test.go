@@ -45,19 +45,21 @@ func TestWalkMenu(t *testing.T) {
 		want    string
 		asked   string
 	}{
-		{"straight through", []string{"Kubernetes", "change"}, "eks-upgrade",
-			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back|"},
-		{"single request skips the list", []string{"Database"}, "rds",
-			"What do you need?|noback|Network"},
+		{"straight through", []string{"Kubernetes", "change", "eks-upgrade"}, "eks-upgrade",
+			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||Kubernetes: change an existing one|back|"},
+		{"a single request is still shown, with Back", []string{"Database", "rds"}, "rds",
+			"What do you need?|noback|Network|Database: create a new one|back|"},
+		{"back from a single-request list", []string{"Database", "BACK", "Kubernetes", "change", "eks-upgrade"}, "eks-upgrade",
+			"What do you need?|noback|Network|Database: create a new one|back||What do you need?|noback|Database|Kubernetes: what do you want to do?|back||Kubernetes: change an existing one|back|"},
 		{"back from new/change to the thing, starting on the last pick",
 			[]string{"Kubernetes", "BACK", "Network", "twingate"}, "twingate",
 			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||What do you need?|noback|Kubernetes|Network: create a new one|back|"},
 		{"back from the list skips the unasked new/change step",
-			[]string{"Network", "BACK", "Database"}, "rds",
-			"What do you need?|noback|Network|Network: create a new one|back||What do you need?|noback|Network"},
+			[]string{"Network", "BACK", "Database", "rds"}, "rds",
+			"What do you need?|noback|Network|Network: create a new one|back||What do you need?|noback|Network|Database: create a new one|back|"},
 		{"back from the list to new/change, starting on the last pick",
-			[]string{"Kubernetes", "create", "BACK", "change"}, "eks-upgrade",
-			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||Kubernetes: create a new one|back||Kubernetes: what do you want to do?|back|create"},
+			[]string{"Kubernetes", "create", "BACK", "change", "eks-upgrade"}, "eks-upgrade",
+			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||Kubernetes: create a new one|back||Kubernetes: what do you want to do?|back|create|Kubernetes: change an existing one|back|"},
 	}
 	// "create" in Kubernetes has one request, so it's picked without a list; use a second one
 	// for the back-from-list case.
@@ -125,5 +127,18 @@ func TestEscGoesBack(t *testing.T) {
 	m2.Update(tea.KeyMsg{Type: tea.KeyDown})
 	if m2.back {
 		t.Error("Down shouldn't mean back")
+	}
+}
+
+func TestRequestHeader(t *testing.T) {
+	h := requestHeader(config.Resource{Name: "rds", DisplayName: "New Aurora PostgreSQL database", Category: "Database", Description: "Create an Aurora database"})
+	for _, want := range []string{"New Aurora PostgreSQL database", "Database · new", "Create an Aurora database"} {
+		if !strings.Contains(h, want) {
+			t.Errorf("header missing %q:\n%s", want, h)
+		}
+	}
+	h = requestHeader(config.Resource{Name: "eks-upgrade", Action: "change"})
+	if !strings.Contains(h, "eks-upgrade") || !strings.Contains(h, "General · change") {
+		t.Errorf("change request header:\n%s", h)
 	}
 }

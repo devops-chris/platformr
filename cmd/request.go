@@ -108,6 +108,8 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	fmt.Println(requestHeader(resource))
+
 	// Change requests edit existing files instead of rendering templates.
 	var sess *updateSession
 	if resource.IsUpdate() {
