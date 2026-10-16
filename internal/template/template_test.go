@@ -34,3 +34,18 @@ func TestRenderStringHasFuncs(t *testing.T) {
 		t.Errorf("RenderString = %q, want %q", got, "a_b")
 	}
 }
+
+func TestMapLookupMissingKeyIsEmpty(t *testing.T) {
+	maps := map[string]map[string]string{"ids": {"known": "111"}}
+	cases := map[string]string{
+		`{{index .maps.ids .account}}`:                        "",
+		`{{if index .maps.ids .account}}yes{{else}}no{{end}}`: "no",
+		`{{if not (index .maps.ids .account)}}ask{{end}}`:     "ask",
+		`{{index .maps.ids "known"}}`:                         "111",
+	}
+	for tmpl, want := range cases {
+		if got := RenderString(tmpl, map[string]string{"account": "new"}, maps); got != want {
+			t.Errorf("%s = %q, want %q", tmpl, got, want)
+		}
+	}
+}

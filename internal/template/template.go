@@ -62,13 +62,11 @@ func buildContext(values map[string]string, maps []map[string]map[string]string)
 		out[k] = v
 	}
 	if len(maps) > 0 && len(maps[0]) > 0 {
+		// Inner maps stay map[string]string: index on a missing key then gives "" (a
+		// map[string]any would give nil, which prints as "<no value>").
 		mapsOut := make(map[string]any, len(maps[0]))
 		for name, m := range maps[0] {
-			inner := make(map[string]any, len(m))
-			for k, v := range m {
-				inner[k] = v
-			}
-			mapsOut[name] = inner
+			mapsOut[name] = m
 		}
 		out["maps"] = mapsOut
 	}
