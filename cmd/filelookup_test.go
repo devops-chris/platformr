@@ -62,3 +62,30 @@ func TestFileLookup(t *testing.T) {
 		}
 	}
 }
+
+func TestSourceRepo(t *testing.T) {
+	res := config.Resource{Resolved: config.ResolvedResource{TemplateRepo: "acme/k8s", TemplateRef: "feature"}}
+	repos := []*config.RepoConfig{
+		{RepoName: "acme/k8s", RepoRef: "feature"},
+		{RepoName: "acme/terraform", RepoRef: ""},
+	}
+	cases := []struct{ repo, wantRepo, wantRef, wantErr string }{
+		{"", "acme/k8s", "feature", ""},              // the request's own repo
+		{"terraform", "acme/terraform", "", ""},      // short name
+		{"acme/terraform", "acme/terraform", "", ""}, // full name
+		{"other", "", "", "isn't connected to platformr"},
+		{"form", "", "", "isn't connected to platformr"}, // no partial-name matches
+	}
+	for _, c := range cases {
+		repo, ref, err := sourceRepo(config.Field{Name: "x", Repo: c.repo}, res, repos)
+		if c.wantErr != "" {
+			if err == nil || !strings.Contains(err.Error(), c.wantErr) {
+				t.Errorf("repo %q: err = %v, want %q", c.repo, err, c.wantErr)
+			}
+			continue
+		}
+		if err != nil || repo != c.wantRepo || ref != c.wantRef {
+			t.Errorf("repo %q: got %s@%s, %v; want %s@%s", c.repo, repo, ref, err, c.wantRepo, c.wantRef)
+		}
+	}
+}

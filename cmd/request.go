@@ -574,11 +574,16 @@ func buildFieldContext(field config.Field, resource config.Resource, repos []*co
 		}
 	}
 
+	repo, ref, repoErr := sourceRepo(field, resource, repos)
+
 	if strings.HasPrefix(field.Source, "dirs:") {
 		dirPath := template.RenderString(strings.TrimPrefix(field.Source, "dirs:"), values, remote.MapsFor(resource, repos))
 		return &prompt.FieldContext{
 			ListFiles: func(_, _ string) ([]string, error) {
-				return gh.ListDirs(resource.Resolved.TemplateRepo, dirPath, resource.Resolved.TemplateRef)
+				if repoErr != nil {
+					return nil, repoErr
+				}
+				return gh.ListDirs(repo, dirPath, ref)
 			},
 		}
 	}
@@ -589,7 +594,10 @@ func buildFieldContext(field config.Field, resource config.Resource, repos []*co
 		filePath := template.RenderString(strings.TrimPrefix(field.Source, "files:"), values, remote.MapsFor(resource, repos))
 		return &prompt.FieldContext{
 			ListFiles: func(_, _ string) ([]string, error) {
-				return gh.ListFiles(resource.Resolved.TemplateRepo, filePath, resource.Resolved.TemplateRef)
+				if repoErr != nil {
+					return nil, repoErr
+				}
+				return gh.ListFiles(repo, filePath, ref)
 			},
 		}
 	}
@@ -689,14 +697,33 @@ func firstFieldName(resource config.Resource) string {
 // Two exceptions, both opted into: optional = true returns "" when the file or the
 // match is missing, and search_parents = true walks up from the folder to find the file.
 func resolveFileLookup(field config.Field, resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, values map[string]string) (string, error) {
+	repo, ref, err := sourceRepo(field, resource, repos)
+	if err != nil {
+		return "", err
+	}
 	fetch := func(p string) (string, error) {
-		c, err := gh.FetchFile(resource.Resolved.TemplateRepo, p, resource.Resolved.TemplateRef)
+		c, err := gh.FetchFile(repo, p, ref)
 		if ghclient.IsNotFound(err) {
 			return "", errFileNotFound
 		}
 		return c, err
 	}
 	return fileLookup(field, template.RenderString(field.Source, values, remote.MapsFor(resource, repos)), fetch)
+}
+
+// sourceRepo is the repo (and ref) a field's dirs:/files: list or file_lookup reads: the
+// request's own, or with `repo` set, another connected repo, read at the same ref platformr
+// loaded its config from (so --ref and the org config's ref apply).
+func sourceRepo(field config.Field, resource config.Resource, repos []*config.RepoConfig) (string, string, error) {
+	if field.Repo == "" {
+		return resource.Resolved.TemplateRepo, resource.Resolved.TemplateRef, nil
+	}
+	for _, r := range repos {
+		if r.RepoName == field.Repo || strings.HasSuffix(r.RepoName, "/"+field.Repo) {
+			return r.RepoName, r.RepoRef, nil
+		}
+	}
+	return "", "", fmt.Errorf("question %q reads from repo %q, which isn't connected to platformr — add it to [[repos]] in the org's .platformr/config.toml", field.Name, field.Repo)
 }
 
 // fileLookup is resolveFileLookup without GitHub, so it can be tested.

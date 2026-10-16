@@ -195,6 +195,10 @@ type Field struct {
 	// Terragrunt's find_in_parent_folders. For files such as env.hcl that sit at
 	// different depths in different accounts.
 	SearchParents bool `toml:"search_parents"`
+	// Repo makes a dirs:/files: list or a file_lookup read from another connected repo
+	// (one listed in the org config's [[repos]]) instead of the request's own. "name" or
+	// "org/name". The repos are the catalog: this is how one repo's request reads another's facts.
+	Repo string `toml:"repo"`
 	// NotFound replaces a file_lookup's technical "couldn't find" / "did not match"
 	// error with a plain message for the person making the request.
 	NotFound string `toml:"not_found"`

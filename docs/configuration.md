@@ -988,6 +988,39 @@ not_found = "This cluster isn't set up for platform projects yet. Ask the platfo
 
 ---
 
+### `repo` — read from another repo (the repos are your catalog)
+
+platformr has no database. Your repos are the catalog: an account is a folder, its ID
+is in a file, a cluster is a folder. When a request in one repo needs facts that live in
+another, such as a Kubernetes GitOps repo needing an account ID from the Terraform repo,
+point the question at that repo with `repo`. It works on `dirs:` and `files:` lists and
+on `file_lookup`:
+
+```toml
+# In the GitOps repo: pick a real account from the Terraform repo, and read its ID there
+[[resources.fields]]
+name   = "account"
+type   = "select"
+label  = "AWS account"
+source = "dirs:cloud/aws"
+repo   = "pt-devops-terraform"
+
+[[resources.fields]]
+name    = "account_id"
+type    = "file_lookup"
+source  = "cloud/aws/{{.account}}/account.hcl"
+pattern = 'aws_account_id\s*=\s*"(\d+)"'
+repo    = "pt-devops-terraform"
+```
+
+- `repo` is the repo's name (or `org/name`). It must be one of the org config's
+  `[[repos]]`; otherwise the request stops and says so.
+- It's read at the same branch platformr loaded that repo's config from: its `ref` in the
+  org config, or `--ref`.
+- Reading only. A request still opens its PR in its own repo.
+
+---
+
 ### Reusable fields — `[defaults.fields]`
 
 Some fields are identical across every resource — `account`, or a `file_lookup` like
