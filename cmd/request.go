@@ -168,14 +168,17 @@ func runRequest(cmd *cobra.Command, args []string) error {
 				resMaps := remote.MapsFor(resource, repos)
 				targetPath := template.RenderString(resource.Resolved.TargetPath, values, resMaps)
 				for _, tf := range tmplFiles {
+					// sourceName (unrendered) is the matching key against TemplateFiles config —
+					// unique on disk even when several files must render to the same outName.
+					sourceName := strings.TrimSuffix(tf.Name, ".tmpl")
+					if !templateFileWanted(resource, sourceName, values, resMaps) {
+						continue
+					}
 					rendered, err := template.Render(tf.Content, values, resMaps)
 					if err != nil {
 						tmplErr = fmt.Errorf("rendering %s: %w", tf.Name, err)
 						return
 					}
-					// sourceName (unrendered) is the matching key against TemplateFiles config —
-					// unique on disk even when several files must render to the same outName.
-					sourceName := strings.TrimSuffix(tf.Name, ".tmpl")
 					outName := template.RenderString(sourceName, values)
 					if skipPath := resolveSkipIfExists(resource, sourceName, values, resMaps); skipPath != "" {
 						var exists bool
@@ -749,6 +752,17 @@ func fileLookup(field config.Field, file string, fetch func(string) (string, err
 		return "", fmt.Errorf("field %q: pattern %q did not match anything in %s", field.Name, field.Pattern, found)
 	}
 	return match[1], nil
+}
+
+// templateFileWanted reports whether a template file belongs in this request: true unless
+// its [[resources.template_files]] entry has a `when` that doesn't render "true".
+func templateFileWanted(resource config.Resource, sourceName string, values map[string]string, maps map[string]map[string]string) bool {
+	for _, tf := range resource.TemplateFiles {
+		if tf.Name == sourceName && tf.When != "" {
+			return template.RenderString(tf.When, values, maps) == "true"
+		}
+	}
+	return true
 }
 
 // resolveSkipIfExists returns the rendered skip_if_exists path for the given source

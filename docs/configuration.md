@@ -249,6 +249,23 @@ Files without an entry use the default. Both fields support `{{.field}}` express
 committing that file. If it does, the file is omitted from the PR silently (a note
 is printed). The other files still render and commit normally.
 
+**`when`** leaves a file out unless the expression renders `"true"`, the same as
+`when` on fields. Use it for optional parts of a request:
+
+```toml
+  [[resources.fields]]
+  name    = "addons"
+  type    = "multiselect"
+  label   = "Optional add-ons"
+  options = ["datadog", "platform"]
+
+  [[resources.template_files]]
+  name        = "datadog-values.yaml"
+  target_path = "clusters/{{.cluster}}/datadog/"
+  output_name = "values.yaml"
+  when        = '{{if contains "datadog" .addons}}true{{end}}'
+```
+
 If every file in the directory is skipped, platformr exits with a message rather
 than opening an empty PR.
 
