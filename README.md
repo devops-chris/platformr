@@ -46,9 +46,13 @@ This is where most of these docs go, and it's a one-time job for the platform te
 
 | Piece | Lives in | What it is |
 |---|---|---|
-| `platformr.toml` | each IaC repo (root) | The request types and the questions each one asks. Many requests? Keep shared settings here and put requests in `platformr/requests/*.toml` |
-| `platformr/templates/` | each IaC repo | The files a request generates, with `{{.answer}}` placeholders |
-| `.platformr/config.toml` | one org-level repo | Which IaC repos platformr reads |
+| `.platformr/config.toml` | one org-level repo | Which IaC repos platformr reads, and the request menu (`[[categories]]`) |
+| `platformr.toml` | each IaC repo (root) | Shared settings for that repo's requests: defaults, reusable questions |
+| `platformr/requests/*.toml` | each IaC repo | The requests and their questions, one file per thing (small repos can keep them in `platformr.toml`) |
+| `platformr/templates/<request>/` | each IaC repo | The files a request generates, with `{{.answer}}` placeholders |
+
+A request in one repo can read facts from another listed repo, such as an account ID
+from the Terraform repo when setting up a Kubernetes cluster, so nothing is copied by hand.
 
 Developers only ever run `platformr request`.
 
@@ -116,6 +120,16 @@ url = "other-org/shared-infra"  # cross-org repos work too
 # [[repos]]
 # url = "terraform-infra"
 # ref = "my-test-branch"
+
+# The request menu for every repo above: its order and a one-line hint per group.
+# Requests join a group with category = "..." (see docs/configuration.md).
+[[categories]]
+name        = "Network"
+description = "VPC and remote access into it"
+
+[[categories]]
+name        = "Kubernetes"
+description = "Clusters"
 ```
 
 Developers can also override the ref for their own runs only, without touching
@@ -126,8 +140,9 @@ this shared config — see [Overriding ref at runtime](docs/configuration.md#ove
 
 ### 2. Add `platformr.toml` to each IaC repo
 
-In each repo listed above, add a `platformr.toml` to the repo root.
-Templates live alongside it in `platformr/templates/`.
+In each repo listed above, add a `platformr.toml` to the repo root for shared settings.
+Requests go in `platformr/requests/*.toml` (or in `platformr.toml` itself for a few), and
+each request's templates in `platformr/templates/<request name>/`.
 
 See [`examples/iac-repo/platformr.toml`](examples/iac-repo/platformr.toml) for
 a full annotated example with Crossplane and Terraform resources.

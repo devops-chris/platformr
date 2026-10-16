@@ -29,7 +29,8 @@ plain YAML and JSON all work the same way.
 ## Why it helps
 
 - **Developers** don't need to know the repo layout, the IaC tool, or naming
-  conventions. They pick from lists, and lists can come from the repo itself.
+  conventions. They pick what they need from a short menu (the thing, then new or
+  change), then from lists that come from your repos themselves.
 - **Platform teams** get every request as a consistent, reviewable PR that already
   follows their conventions.
 - **Nothing new to run or trust.** No server, no cloud credentials, no state. It
@@ -39,10 +40,13 @@ plain YAML and JSON all work the same way.
 
 | Piece | Lives in | What it is |
 |---|---|---|
-| `platformr.toml` | each IaC repo (root) | Shared settings, and/or the request types and their questions |
-| `platformr/requests/*.toml` | each IaC repo (optional) | Requests split into one file per thing |
-| `platformr/templates/` | each IaC repo | Files a create request generates, with `{{.answer}}` blanks |
-| `.platformr/config.toml` | one org-level repo | Which IaC repos platformr reads |
+| `.platformr/config.toml` | one org-level repo | Which IaC repos platformr reads, and the request menu (`[[categories]]`) |
+| `platformr.toml` | each IaC repo (root) | Shared settings for that repo's requests: defaults, reusable questions |
+| `platformr/requests/*.toml` | each IaC repo | The requests and their questions, one file per thing (small repos can keep them in `platformr.toml`) |
+| `platformr/templates/<request>/` | each IaC repo | The files a request generates, with `{{.answer}}` placeholders |
+
+A request in one repo can read facts from another listed repo, such as an account ID
+from the Terraform repo when setting up a Kubernetes cluster, so nothing is copied by hand.
 
 Developers only ever run `platformr request`.
 
