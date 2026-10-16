@@ -826,6 +826,10 @@ skip_if_empty = true
 
 ### Dynamic select — `source = "dirs:<path>"`
 
+Lists longer than 10 options show 10 at a time and scroll, with a "Type / to search"
+hint: typing after `/` narrows the list. This keeps the request heading and earlier
+answers on screen.
+
 Lists subdirectory names at a static path in the IaC repo at request time.
 Use this for fields whose options are directories in the repo (e.g. account names).
 

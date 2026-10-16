@@ -37,6 +37,14 @@ func PromptField(field config.Field, values map[string]string, ctx *FieldContext
 	}
 }
 
+// listRows is how many options a list shows before it scrolls. Without a limit a long
+// list (every AWS account) fills the terminal and pushes the request heading and earlier
+// answers off the top.
+const listRows = 10
+
+// searchHint is shown on long lists: huh filters a list as you type after "/".
+const searchHint = "Type / to search"
+
 func promptSelect(label string, field config.Field, ctx *FieldContext) (string, error) {
 	options, err := resolveOptions(field, ctx)
 	if err != nil {
@@ -74,7 +82,14 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 		Title(label).
 		Options(toHuhOptions(options)...).
 		Value(&val)
+	long := len(options) > listRows
+	if long {
+		sel.Description(searchHint)
+	}
 	sel.WithTheme(ui.Theme())
+	if long {
+		sel.Height(listRows + 2) // + title and hint lines
+	}
 	if err := sel.Run(); err != nil {
 		return "", err
 	}
@@ -195,9 +210,14 @@ func promptMultiSelect(label string, field config.Field, ctx *FieldContext) (str
 		return "", fmt.Errorf("%s: there's nothing to choose from", label)
 	}
 	var picked []string
+	long := len(options) > listRows
+	hint := "Space to tick or untick, Enter when done"
+	if long {
+		hint += " · " + searchHint
+	}
 	ms := huh.NewMultiSelect[string]().
 		Title(label).
-		Description("Space to tick or untick, Enter when done").
+		Description(hint).
 		Options(multiOptions(options, field.Default)...).
 		Value(&picked)
 	if !field.Optional {
@@ -209,6 +229,9 @@ func promptMultiSelect(label string, field config.Field, ctx *FieldContext) (str
 		})
 	}
 	ms.WithTheme(ui.Theme())
+	if long {
+		ms.Height(listRows + 2) // + title and hint lines
+	}
 	if err := ms.Run(); err != nil {
 		return "", err
 	}
