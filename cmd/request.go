@@ -161,7 +161,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 					return
 				}
 				if len(tmplFiles) == 0 {
-					tmplErr = fmt.Errorf("no .tmpl files found in %s (repo %s, ref %q) — check template_dir_path and the configured ref",
+					tmplErr = fmt.Errorf("no .tmpl files found in %s (repo %s, ref %q) — check templates_dir (or the request's template_dir) and the configured ref",
 						resource.Resolved.TemplateDir, resource.Resolved.TemplateRepo, resource.Resolved.TemplateRef)
 					return
 				}

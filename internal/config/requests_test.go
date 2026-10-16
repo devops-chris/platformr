@@ -84,6 +84,7 @@ func TestAddRequestFileRejectsProblemsAndAddsNothing(t *testing.T) {
 		"duplicate within file":  {"[[resources]]\nname = \"a\"\n[[resources]]\nname = \"a\"\n", `request named "a" already exists`},
 		"map already in root":    {"[maps.sizes]\nx = \"y\"\n[[resources]]\nname = \"a\"\n", `map named "sizes" already exists`},
 		"defaults in a file":     {"[defaults]\nbase_branch = \"main\"\n[[resources]]\nname = \"a\"\n", `"defaults" can only be set in platformr.toml`},
+		"templates_dir in file":  {"templates_dir = \"x\"\n[[resources]]\nname = \"a\"\n", `"templates_dir" can only be set in platformr.toml`},
 		"requests_dir in a file": {"requests_dir = \"x\"\n[[resources]]\nname = \"a\"\n", `"requests_dir" can only be set in platformr.toml`},
 		"categories in a file":   {"[[categories]]\nname = \"x\"\n[[resources]]\nname = \"a\"\n", `"categories" can only be set in platformr.toml`},
 		"unknown action":         {"[[resources]]\nname = \"a\"\naction = \"update\"\n", `use "create" (the default) or "change"`},
@@ -150,5 +151,75 @@ func TestResourceTemplateBeatsDefaultDir(t *testing.T) {
 	b := rc.Resources[len(rc.Resources)-1]
 	if b.Resolved.TemplateDir != "" || b.Resolved.Template != "platformr/templates/brand.tf.tmpl" {
 		t.Errorf("dir %q template %q", b.Resolved.TemplateDir, b.Resolved.Template)
+	}
+}
+
+func TestTemplatesDir(t *testing.T) {
+	resolve := func(t *testing.T, root string) map[string]string {
+		t.Helper()
+		var rc RepoConfig
+		if _, err := toml.Decode(root+`
+[[resources]]
+name = "vpc"
+
+[[resources]]
+name = "custom"
+template_dir = "elsewhere/custom"
+
+[[resources]]
+name        = "vpc-resize"
+update_file = "x.hcl"
+`, &rc); err != nil {
+			t.Fatal(err)
+		}
+		Resolve(&OrgConfig{}, &rc)
+		out := map[string]string{}
+		for _, r := range rc.Resources {
+			out[r.Name] = r.Resolved.TemplateDir
+		}
+		return out
+	}
+	cases := map[string]struct {
+		root string
+		vpc  string
+	}{
+		"default":                 {"", "platformr/templates/vpc"},
+		"templates_dir":           {`templates_dir = "infra/tmpl"`, "infra/tmpl/vpc"},
+		"old template_dir_path":   {"[defaults]\ntemplate_dir_path = \"old/{{.resource}}\"", "old/vpc"},
+		"old single-file default": {"[defaults]\ntemplate_path = \"t/{{.resource}}.tmpl\"", ""},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := resolve(t, c.root)
+			if got["vpc"] != c.vpc {
+				t.Errorf("vpc template dir = %q, want %q", got["vpc"], c.vpc)
+			}
+			if got["custom"] != "elsewhere/custom" {
+				t.Errorf("a request's own template_dir should win, got %q", got["custom"])
+			}
+			if name != "old template_dir_path" && got["vpc-resize"] != "" {
+				t.Errorf("change-only request shouldn't get a template folder, got %q", got["vpc-resize"])
+			}
+		})
+	}
+}
+
+func TestValidateRepoConfig(t *testing.T) {
+	cases := map[string]struct{ root, wantErr string }{
+		"fine":             {`templates_dir = "infra/tmpl"`, ""},
+		"pattern":          {`templates_dir = "t/{{.resource}}"`, "use a plain folder path"},
+		"old and new both": {"templates_dir = \"t\"\n[defaults]\ntemplate_dir_path = \"t/{{.resource}}\"", "remove the old one"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			var rc RepoConfig
+			if _, err := toml.Decode(c.root, &rc); err != nil {
+				t.Fatal(err)
+			}
+			err := rc.Validate()
+			if c.wantErr == "" && err != nil || c.wantErr != "" && (err == nil || !strings.Contains(err.Error(), c.wantErr)) {
+				t.Errorf("err = %v, want %q", err, c.wantErr)
+			}
+		})
 	}
 }

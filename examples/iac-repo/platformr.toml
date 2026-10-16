@@ -1,13 +1,12 @@
 # acme-corp/platform-claims/platformr.toml
 #
 # This file lives in the root of an IaC repo alongside the IaC it describes.
-# Templates live at platformr/templates/ within the same repo.
-# Adding a new resource type = add an entry here + a template file, in the same PR.
+# Templates live at platformr/templates/<request name>/ within the same repo.
+# Adding a new resource type = add an entry here + its template folder, in the same PR.
 
 [defaults]
-target_path   = "claims/{{.resource}}/"
-template_path = "platformr/templates/{{.resource}}.yaml.tmpl"
-base_branch   = "main"
+target_path = "claims/{{.resource}}/"
+base_branch = "main"
 
 [[resources]]
 name        = "project"
@@ -24,7 +23,6 @@ pr_title    = "feat(project): add {{.name}}"
 [[resources]]
 name         = "ecr"
 description  = "Add a new ECR repository with IAM push access"
-template_dir = "platformr/templates/ecr"
 pr_title     = "feat(ecr): add {{.name}} repository"
 
   # Once applied, the repository's outputs are expected here — see

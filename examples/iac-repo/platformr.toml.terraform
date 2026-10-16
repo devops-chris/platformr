@@ -3,10 +3,11 @@
 # Terraform resources. Target paths and templates are different from Crossplane
 # but the model is identical — platformr doesn't care which executor runs the IaC.
 
+# Templates: platformr/templates/<request name>/ (the default; see templates_dir).
+
 [defaults]
-target_path   = "environments/{{.resource}}/"
-template_path = "platformr/templates/{{.resource}}.tfvars.tmpl"
-base_branch   = "main"
+target_path = "environments/{{.resource}}/"
+base_branch = "main"
 
 [[resources]]
 name        = "database"

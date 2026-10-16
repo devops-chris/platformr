@@ -135,6 +135,9 @@ func (l *Loader) loadRepoConfig(repoURL, ref string) (*config.RepoConfig, error)
 	if _, err := toml.Decode(content, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing repo config for %s: %w", repoURL, err)
 	}
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 
 	parts := strings.SplitN(repoURL, "/", 2)
 	cfg.RepoOwner = parts[0]

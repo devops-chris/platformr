@@ -1,6 +1,9 @@
 package config
 
-import "strings"
+import (
+	"path"
+	"strings"
+)
 
 // Resolve merges org-level and repo-level defaults into each resource's
 // Resolved fields. Call this after loading a RepoConfig.
@@ -39,9 +42,14 @@ func Resolve(orgCfg *OrgConfig, repo *RepoConfig) {
 
 		// Template dir (multi-file) takes precedence over single-file template.
 		// A resource's own single-file `template` wins over a repo/org default template dir.
+		// Repo-wide: templates_dir (or its default), unless the old [defaults] settings are used.
 		tmplDir := r.TemplateDir
 		if tmplDir == "" && r.Template == "" {
 			tmplDir = coalesce(repo.Defaults.TemplateDirPath, orgCfg.Defaults.TemplateDirPath)
+			oldSingleFile := coalesce(repo.Defaults.TemplatePath, orgCfg.Defaults.TemplatePath) != ""
+			if tmplDir == "" && !oldSingleFile && r.RendersTemplates() {
+				tmplDir = path.Join(repo.TemplatesDirPath(), r.Name)
+			}
 		}
 		r.Resolved.TemplateDir = renderPattern(tmplDir, r.Name)
 

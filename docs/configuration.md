@@ -124,46 +124,39 @@ Lives in the root of any IaC repo listed in the org config.
 The team that owns the IaC repo owns this file.
 Resource definitions and templates live here alongside the IaC they describe.
 
-### Single-file template mode
+### Where templates and requests live
 
-One template file renders to one committed file:
+Two folders, both set at the top of `platformr.toml`, both optional:
 
 ```toml
+requests_dir  = "platformr/requests"    # default: every *.toml here is a request file
+templates_dir = "platformr/templates"   # default: each request's templates are in <templates_dir>/<request name>/
+
 [defaults]
-# {{.resource}} is replaced with the resource type name at load time.
+# {{.resource}} is replaced with the request name at load time.
 # All other {{.field}} expressions are replaced with user input at request time.
-target_path   = "claims/{{.resource}}/"
-template_path = "platformr/templates/{{.resource}}.yaml.tmpl"
-base_branch   = "main"
+target_path = "cloud/aws/{{.account}}/{{.region}}/{{.resource}}/"
+base_branch = "main"
 
 [[resources]]
-name        = "service"
-description = "Create a new microservice"
-pr_title    = "feat(service): add {{.name}}"
-
-  [[resources.fields]]
-  name        = "name"
-  type        = "input"
-  label       = "Service name"
-  placeholder = "payments-worker"
-  validate    = "unique"
+name        = "vpc"                     # templates: platformr/templates/vpc/
+description = "Request a new VPC"
 ```
 
-### Multi-file template mode
-
-One request renders an entire directory of `.tmpl` files (e.g. multiple Terraform files).
-Set `template_dir_path` instead of `template_path`:
-
-```toml
-[defaults]
-target_path       = "cloud/aws/{{.account}}/{{.region}}/{{.resource}}/"
-template_dir_path = "platformr/templates/{{.resource}}"
-base_branch       = "main"
-```
-
-Every `.tmpl` file in the directory is fetched, rendered, and committed.
+Every `.tmpl` file in a request's folder is fetched, rendered, and committed.
 The output filename is the template name with `.tmpl` stripped
-(e.g. `vpc.tf.tmpl` → `vpc.tf`).
+(`vpc.tf.tmpl` → `vpc.tf`). One template in the folder means one committed file.
+
+- **A request can use a different folder** with `template_dir = "some/other/folder"`.
+- **Change-only requests** (ones with `update_file` and no templates of their own)
+  don't need a folder.
+- Both settings are plain folder paths. platformr adds the request name itself.
+
+!!! note "Older settings"
+    `[defaults] template_dir_path` (a pattern like `"platformr/templates/{{.resource}}"`)
+    and `[defaults] template_path` (one template file per request) still work.
+    `templates_dir` replaces them. Setting both the old and new names is an error,
+    so there's only ever one answer to "where are the templates?".
 
 ### Splitting requests into separate files
 
@@ -204,7 +197,8 @@ How it works:
   `[defaults.fields]`) and `[maps]` in `platformr.toml` apply to requests in every
   file.
 - **A request file can add its own `[maps]`** (e.g. sizes only its requests use).
-  It can't set `[defaults]` or `requests_dir`; those belong in `platformr.toml`.
+  It can't set `[defaults]`, `requests_dir`, `templates_dir` or `[[categories]]`;
+  those belong in `platformr.toml`.
 - **Names must be unique** across `platformr.toml` and all request files, for both
   requests and maps.
 - **A broken file only hides its own requests.** platformr shows a warning naming
@@ -829,8 +823,7 @@ appears earlier in the list.
 ### Dynamic select — `source = "files:<path>"`
 
 Same as `dirs:`, but for resource types committed as **one flat file per
-instance** instead of one directory per instance — i.e. resources using
-`template_path` (single-file mode) rather than `template_dir_path`. Lists file
+instance** instead of one directory per instance. Lists file
 names at the given path, with the extension stripped:
 
 ```toml

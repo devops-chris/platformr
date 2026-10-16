@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -10,6 +11,10 @@ import (
 // DefaultRequestsDir is where extra request files live when platformr.toml
 // doesn't set requests_dir.
 const DefaultRequestsDir = "platformr/requests"
+
+// DefaultTemplatesDir is where request templates live when platformr.toml
+// doesn't set templates_dir: one subfolder per request.
+const DefaultTemplatesDir = "platformr/templates"
 
 // requestFile is what a file in the requests folder may contain: the same
 // [[resources]] and [maps] blocks platformr.toml uses, nothing else.
@@ -26,6 +31,27 @@ func (r *RepoConfig) RequestsDirPath() string {
 	return DefaultRequestsDir
 }
 
+// TemplatesDirPath returns the folder holding one subfolder of templates per request.
+func (r *RepoConfig) TemplatesDirPath() string {
+	if r.TemplatesDir != "" {
+		return r.TemplatesDir
+	}
+	return DefaultTemplatesDir
+}
+
+// Validate checks platformr.toml's own settings (not the requests in it).
+func (r *RepoConfig) Validate() error {
+	for _, s := range []struct{ key, val string }{{"requests_dir", r.RequestsDir}, {"templates_dir", r.TemplatesDir}} {
+		if strings.Contains(s.val, "{{") {
+			return fmt.Errorf("%s = %q — use a plain folder path; platformr adds the request name itself", s.key, s.val)
+		}
+	}
+	if r.TemplatesDir != "" && (r.Defaults.TemplateDirPath != "" || r.Defaults.TemplatePath != "") {
+		return fmt.Errorf("templates_dir is set, and so is the old [defaults] template_dir_path or template_path — remove the old one")
+	}
+	return nil
+}
+
 // AddRequestFile parses one request file and adds its requests and maps to r.
 // Nothing is added if the file has any problem, so a broken file only hides its
 // own requests. Errors name the file and say what to fix.
@@ -35,7 +61,7 @@ func (r *RepoConfig) AddRequestFile(path, content string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
-	for _, key := range []string{"defaults", "requests_dir", "categories"} {
+	for _, key := range []string{"defaults", "requests_dir", "templates_dir", "categories"} {
 		if md.IsDefined(key) {
 			return fmt.Errorf("%s: %q can only be set in platformr.toml, not in a request file", path, key)
 		}

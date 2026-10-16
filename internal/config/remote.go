@@ -19,11 +19,9 @@ type OrgGitHubConfig struct {
 type ResourceDefaults struct {
 	// TargetPath supports {{.resource}} interpolation, e.g. "claims/{{.resource}}/"
 	TargetPath string `toml:"target_path"`
-	// TemplatePath supports {{.resource}} interpolation — single file mode.
-	TemplatePath string `toml:"template_path"`
-	// TemplateDirPath supports {{.resource}} interpolation — multi-file mode.
-	// Every .tmpl file in this directory is rendered and committed.
-	// Takes precedence over template_path when both are set.
+	// TemplatePath and TemplateDirPath are the old way to say where templates are
+	// (patterns with {{.resource}}). They still work; templates_dir replaces them.
+	TemplatePath    string `toml:"template_path"`
 	TemplateDirPath string `toml:"template_dir_path"`
 	BaseBranch      string `toml:"base_branch"`
 	// Fields is a library of reusable field definitions, not fields every resource
@@ -52,6 +50,9 @@ type RepoConfig struct {
 	// Lets a repo with many requests keep one file per thing instead of one huge
 	// platformr.toml. Defaults to DefaultRequestsDir; a missing folder is fine.
 	RequestsDir string `toml:"requests_dir"`
+	// TemplatesDir is the folder holding one subfolder of templates per request:
+	// <templates_dir>/<request name>/. Defaults to DefaultTemplatesDir.
+	TemplatesDir string `toml:"templates_dir"`
 	// Categories sets the request menu's order and one-line hints (optional).
 	Categories []CategoryConfig `toml:"categories"`
 	Defaults   ResourceDefaults `toml:"defaults"`
