@@ -52,4 +52,13 @@ func TestFileLookup(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "did not match") {
 		t.Errorf("no match, not optional: %v", err)
 	}
+
+	// not_found: the request's own plain message instead, for a missing file or no match.
+	msg := "This cluster isn't set up for platform projects yet. Ask the platform team."
+	for _, file := range []string{"cloud/aws/nope/x.yaml", "cloud/aws/acct-b/account.hcl"} {
+		_, err = fileLookup(config.Field{Name: "brand", Pattern: `brand = "(.*)"`, NotFound: msg}, file, fetch)
+		if err == nil || err.Error() != msg {
+			t.Errorf("not_found for %s: %v", file, err)
+		}
+	}
 }

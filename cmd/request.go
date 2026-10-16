@@ -737,6 +737,9 @@ func fileLookup(field config.Field, file string, fetch func(string) (string, err
 		if field.Optional {
 			return "", nil
 		}
+		if field.NotFound != "" {
+			return "", errors.New(field.NotFound)
+		}
 		where := file
 		if field.SearchParents {
 			where = pathpkg.Base(file) + " in " + pathpkg.Dir(file) + " or any folder above it"
@@ -748,6 +751,9 @@ func fileLookup(field config.Field, file string, fetch func(string) (string, err
 	if match == nil {
 		if field.Optional {
 			return "", nil
+		}
+		if field.NotFound != "" {
+			return "", errors.New(field.NotFound)
 		}
 		return "", fmt.Errorf("field %q: pattern %q did not match anything in %s", field.Name, field.Pattern, found)
 	}

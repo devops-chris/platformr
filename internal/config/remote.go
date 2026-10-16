@@ -195,6 +195,9 @@ type Field struct {
 	// Terragrunt's find_in_parent_folders. For files such as env.hcl that sit at
 	// different depths in different accounts.
 	SearchParents bool `toml:"search_parents"`
+	// NotFound replaces a file_lookup's technical "couldn't find" / "did not match"
+	// error with a plain message for the person making the request.
+	NotFound string `toml:"not_found"`
 	// Key points at a value in the request's update_file (or this field's own
 	// update_file): the question starts on the current value there, and the answer is
 	// written back to the same spot. A string is a dotted path ("resources.requests.cpu");

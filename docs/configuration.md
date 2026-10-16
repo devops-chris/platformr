@@ -975,6 +975,15 @@ type           = "file_lookup"
 source         = "cloud/aws/{{.account}}/{{.where}}/env.hcl"
 pattern        = '(?m)^\s*environment\s*=\s*"([^"]*)"'
 search_parents = true
+
+# not_found: what to tell the person when the file or value isn't there, instead of
+# the technical "couldn't find <path>" error
+[[resources.fields]]
+name      = "aws_account_id"
+type      = "file_lookup"
+source    = "clusters/{{.cluster}}/argocd/service-account.yaml"
+pattern   = 'arn:aws:iam::(\d+):'
+not_found = "This cluster isn't set up for platform projects yet. Ask the platform team."
 ```
 
 ---
