@@ -319,7 +319,7 @@ func (c *Client) FileExists(repo, path, ref string) (bool, error) {
 
 // RequestLabel is applied to every pull request platformr opens, so that requests
 // can be found later via GitHub search regardless of branch name or title — see
-// MyRequestPRs.
+// RequestPRs.
 const RequestLabel = "platformr"
 
 // CurrentUser returns the login of the authenticated GitHub user.
@@ -338,13 +338,15 @@ type PRStatus struct {
 	Title     string
 	Body      string
 	State     string // "open", "merged", or "closed"
+	Author    string
 	URL       string
 	CreatedAt time.Time
 }
 
-// MyRequestPRs returns pull requests in repo labeled RequestLabel and authored by
-// user, newest first. The label and author filters are applied server-side by
-// GitHub search, so only matching PRs are ever fetched — not the whole repo's PR list.
+// RequestPRs returns pull requests in repo labeled RequestLabel, newest first —
+// authored by author, or by anyone when author is "". Both filters go into the
+// GitHub search query, so only platformr PRs are ever fetched — not the whole
+// repo's PR list, which matters most when author is "" and nothing else narrows it.
 //
 // maxResults bounds how many are fetched, stopping as soon as that many are
 // collected (results arrive newest-first, so this is a correct "N most recent",
@@ -359,15 +361,18 @@ type PRStatus struct {
 // closed-unmerged PRs are skipped entirely rather than fetched-then-filtered,
 // so maxResults/pagination keep working correctly against what's actually kept.
 //
-// Filtering by author happens server-side (GitHub search's author: qualifier
-// has proven reliable); filtering by label does not — confirmed directly that
-// GitHub's label: search filter can keep matching a PR for hours after its
-// label was removed, even though the very same search response's own Labels
-// field for that PR is already correct. So the label check happens client-side
-// against that field instead of trusting the query clause for it.
-func (c *Client) MyRequestPRs(repo, user string, maxResults int, includeClosed bool) ([]PRStatus, error) {
+// The label: qualifier narrows the search but isn't trusted on its own —
+// confirmed directly that GitHub's label: search filter can keep matching a PR
+// for hours after its label was removed, even though the very same search
+// response's own Labels field for that PR is already correct. Those stale
+// matches are extras, never omissions (platformr labels a PR as it opens it),
+// so the label is re-checked client-side against that field to drop them.
+func (c *Client) RequestPRs(repo, author string, maxResults int, includeClosed bool) ([]PRStatus, error) {
 	ctx := context.Background()
-	query := fmt.Sprintf("repo:%s is:pr author:%s", repo, user)
+	query := fmt.Sprintf("repo:%s is:pr label:%s", repo, RequestLabel)
+	if author != "" {
+		query += " author:" + author
+	}
 	opts := &gh.SearchOptions{
 		Sort:        "created",
 		Order:       "desc",
@@ -402,6 +407,7 @@ func (c *Client) MyRequestPRs(repo, user string, maxResults int, includeClosed b
 				Title:     issue.GetTitle(),
 				Body:      issue.GetBody(),
 				State:     state,
+				Author:    issue.GetUser().GetLogin(),
 				URL:       issue.GetHTMLURL(),
 				CreatedAt: issue.GetCreatedAt().Time,
 			})

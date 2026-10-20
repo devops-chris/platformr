@@ -85,6 +85,10 @@ platformr catalog service --json # machine-readable
 
 # Check the status of PRs you've opened
 platformr status
+
+# ...or someone else's, or everyone's (e.g. "did anyone already request this?")
+platformr status --user sam
+platformr status --everyone
 ```
 
 ---
@@ -277,7 +281,7 @@ with a `401 Bad credentials` error, run `platformr auth` again to reauthorize.
 | `platformr catalog` | List available resource types |
 | `platformr catalog <name>` | Show field schema for a resource |
 | `platformr catalog --json` | Machine-readable schema output |
-| `platformr status` | Check the status of PRs you've opened (open/merged; add `--all` to include closed-without-merge) |
+| `platformr status` | Check the status of PRs you've opened (open/merged; add `--all` to include closed-without-merge, `--user <login>` or `--everyone` to see others' requests) |
 | `platformr version` | Print version info |
 | `--ref <branch>` (any command) | Override the IaC repo ref for this run only (or `PLATFORMR_REF`) |
 

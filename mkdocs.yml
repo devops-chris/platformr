@@ -36,5 +36,6 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Changing existing resources: changing-existing-resources.md
+  - Checking on requests: checking-requests.md
   - Configuration reference: configuration.md
   - Shell completion: completion.md

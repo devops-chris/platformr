@@ -44,14 +44,23 @@ var (
 	detailLineRe     = regexp.MustCompile(`(?m)^- \*\*(.+?)\*\*: (.*)$`)
 )
 
-var statusAll bool
+var (
+	statusAll      bool
+	statusUser     string
+	statusEveryone bool
+)
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Check the status of your requests",
+	Short: "Check the status of your requests (or anyone's)",
 	Long: `Checks the IaC repos in your connected org for pull requests you opened via
 ` + "`platformr request`" + ` and reports whether each is open or merged.
-Closed-without-merge requests are hidden by default — pass --all to see them too.`,
+Closed-without-merge requests are hidden by default — pass --all to see them too.
+
+Pass --user <login> to see someone else's requests, or --everyone to see all of
+them — e.g. to check whether a teammate already requested something. You'll see
+whatever the repos' read access already lets you see on GitHub; revealing an
+output value still goes through lockr and your own cloud permissions.`,
 	Args: cobra.NoArgs,
 	RunE: runStatus,
 }
@@ -60,6 +69,9 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 	statusCmd.Flags().BoolVar(&statusAll, "all", false, fmt.Sprintf(
 		"Show every request, including closed-without-merge, with no count limit (default: open + merged only, most recent %d)", defaultStatusLimit))
+	statusCmd.Flags().StringVar(&statusUser, "user", "", "Show requests opened by this GitHub login instead of your own")
+	statusCmd.Flags().BoolVar(&statusEveryone, "everyone", false, "Show requests opened by anyone, not just you")
+	statusCmd.MarkFlagsMutuallyExclusive("user", "everyone")
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
@@ -110,24 +122,32 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		perRepoLimit = 0
 	}
 
-	var mine []ghclient.PRStatus
+	// Whose requests to search for — "" means anyone (--everyone).
+	author := currentUser
+	if statusUser != "" {
+		author = strings.TrimPrefix(statusUser, "@")
+	} else if statusEveryone {
+		author = ""
+	}
+
+	var prs []ghclient.PRStatus
 	var mayHaveMore bool
 	var fetchErr error
 	_ = spinner.New().
 		Title("Checking PR status...").
 		Action(func() {
 			for repo := range targetRepos {
-				prs, err := gh.MyRequestPRs(repo, currentUser, perRepoLimit, statusAll)
+				repoPRs, err := gh.RequestPRs(repo, author, perRepoLimit, statusAll)
 				if err != nil {
 					fetchErr = err
 					return
 				}
 				// Hitting the per-repo cap means this repo alone may have more
 				// than we fetched — an honest signal, not a precise count.
-				if !statusAll && len(prs) == perRepoLimit {
+				if !statusAll && len(repoPRs) == perRepoLimit {
 					mayHaveMore = true
 				}
-				mine = append(mine, prs...)
+				prs = append(prs, repoPRs...)
 			}
 		}).
 		Run()
@@ -135,20 +155,24 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("checking PR status: %w", fetchErr)
 	}
 
-	if len(mine) == 0 {
-		fmt.Println(ui.Subtle("No requests found for " + currentUser + "."))
+	if len(prs) == 0 {
+		if author == "" {
+			fmt.Println(ui.Subtle("No requests found."))
+		} else {
+			fmt.Println(ui.Subtle("No requests found for " + author + "."))
+		}
 		return nil
 	}
 
-	sort.Slice(mine, func(i, j int) bool { return mine[i].CreatedAt.After(mine[j].CreatedAt) })
+	sort.Slice(prs, func(i, j int) bool { return prs[i].CreatedAt.After(prs[j].CreatedAt) })
 
-	if !statusAll && len(mine) > defaultStatusLimit {
+	if !statusAll && len(prs) > defaultStatusLimit {
 		mayHaveMore = true
-		mine = mine[:defaultStatusLimit]
+		prs = prs[:defaultStatusLimit]
 	}
 
-	printStatusSummary(currentUser, mine, mayHaveMore)
-	return offerRequestPicker(mine)
+	printStatusSummary(author, currentUser, prs, mayHaveMore)
+	return offerRequestPicker(prs, currentUser)
 }
 
 // printStatusSummary prints one line of counts — no table. With more than a
@@ -156,7 +180,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 // same rows twice; the picker below is the one place requests are actually
 // listed, and it's searchable (type/name, or just part of either) instead of
 // something you scroll through.
-func printStatusSummary(user string, prs []ghclient.PRStatus, mayHaveMore bool) {
+//
+// author is whose requests were searched for ("" for everyone); currentUser
+// decides whether that reads as "Your requests" or someone else's.
+func printStatusSummary(author, currentUser string, prs []ghclient.PRStatus, mayHaveMore bool) {
 	open, merged, closed := 0, 0, 0
 	for _, pr := range prs {
 		switch pr.State {
@@ -174,10 +201,21 @@ func printStatusSummary(user string, prs []ghclient.PRStatus, mayHaveMore bool) 
 		// closed-without-merge requests entirely.
 		counts += fmt.Sprintf(", %d closed", closed)
 	}
-	fmt.Printf("\n  %s  %s — %s\n",
-		ui.SectionHeader("Your requests"), ui.Subtle(user), counts)
+	heading, whose := "Your requests", "your"
+	switch author {
+	case "":
+		heading, whose = "All requests", "the"
+	case currentUser:
+	default:
+		heading, whose = author+"'s requests", author+"'s"
+	}
+	who := ""
+	if author != "" {
+		who = "  " + ui.Subtle(author)
+	}
+	fmt.Printf("\n  %s%s — %s\n", ui.SectionHeader(heading), who, counts)
 	if mayHaveMore {
-		fmt.Println(ui.Subtle(fmt.Sprintf("  Showing your %d most recent — run `platformr status --all` for your full history.", len(prs))))
+		fmt.Println(ui.Subtle(fmt.Sprintf("  Showing %s %d most recent — add --all for the full history.", whose, len(prs))))
 	}
 	fmt.Println()
 }
@@ -192,15 +230,19 @@ func printStatusSummary(user string, prs []ghclient.PRStatus, mayHaveMore bool) 
 // hardcoded field name that not every resource or IaC tool will have.
 // Selecting shows a styled detail view with status and outputs together, since
 // checking either is the actual reason to look this up.
-func offerRequestPicker(prs []ghclient.PRStatus) error {
+func offerRequestPicker(prs []ghclient.PRStatus, currentUser string) error {
 	// PR numbers are only unique per-repo — a requestor may not even be aware
 	// there's more than one registered IaC repo. Only disambiguate when it's
 	// actually ambiguous, so the common single-repo case stays uncluttered.
-	multiRepo := false
+	// Same reasoning for authors: only show who opened each request when the
+	// list actually mixes people (--everyone); otherwise the heading says whose.
+	multiRepo, multiAuthor := false, false
 	for _, pr := range prs {
 		if pr.Repo != prs[0].Repo {
 			multiRepo = true
-			break
+		}
+		if pr.Author != prs[0].Author {
+			multiAuthor = true
 		}
 	}
 
@@ -210,7 +252,7 @@ func offerRequestPicker(prs []ghclient.PRStatus) error {
 	// commit subjects). Everything before it is bounded and gets padded so it
 	// actually lines up, unlike title, which was previously stuck in the
 	// middle of the line with no padding of its own.
-	typeWidth, numWidth, repoWidth := 0, 0, 0
+	typeWidth, numWidth, repoWidth, authorWidth := 0, 0, 0, 0
 	for _, pr := range prs {
 		if w := len(parseResourceType(pr.Body)); w > typeWidth {
 			typeWidth = w
@@ -220,6 +262,9 @@ func offerRequestPicker(prs []ghclient.PRStatus) error {
 		}
 		if w := len(repoDisambiguator(pr.Repo)); w > repoWidth {
 			repoWidth = w
+		}
+		if w := len(pr.Author); w > authorWidth {
+			authorWidth = w
 		}
 	}
 
@@ -233,8 +278,12 @@ func offerRequestPicker(prs []ghclient.PRStatus) error {
 		if multiRepo {
 			repoPart = fmt.Sprintf("[%-*s]  ", repoWidth, repoDisambiguator(pr.Repo))
 		}
-		label := fmt.Sprintf("%-*s  #%-*d  %s%s  %s  %s",
-			typeWidth, parseResourceType(pr.Body), numWidth, pr.Number, repoPart, statusLabel(pr.State), marker, pr.Title)
+		authorPart := ""
+		if multiAuthor {
+			authorPart = fmt.Sprintf("%-*s  ", authorWidth, pr.Author)
+		}
+		label := fmt.Sprintf("%-*s  #%-*d  %s%s%s  %s  %s",
+			typeWidth, parseResourceType(pr.Body), numWidth, pr.Number, repoPart, authorPart, statusLabel(pr.State), marker, pr.Title)
 		opts[i] = huh.NewOption(label, i)
 	}
 	opts = append(opts, huh.NewOption("— skip —", -1))
@@ -242,7 +291,7 @@ func offerRequestPicker(prs []ghclient.PRStatus) error {
 	var selected int
 	sel := huh.NewSelect[int]().
 		Title("Find a request").
-		Description("Press / then type to search — e.g. a resource type, a word from its title, or a PR number.").
+		Description("Press / then type to search — e.g. a resource type, a word from its title, a PR number, or a login.").
 		Options(opts...).
 		Value(&selected)
 	sel.WithTheme(ui.Theme())
@@ -253,7 +302,7 @@ func offerRequestPicker(prs []ghclient.PRStatus) error {
 		return nil
 	}
 
-	fmt.Println(renderRequestDetail(prs[selected]))
+	fmt.Println(renderRequestDetail(prs[selected], currentUser))
 	return offerValueReveal(prs[selected])
 }
 
@@ -316,12 +365,15 @@ func offerValueReveal(pr ghclient.PRStatus) error {
 // renderRequestDetail builds a styled, bordered detail box for one request —
 // its status, URL, and outputs (rendered as clean key/value lines, not the raw
 // markdown they're stored as in the PR body) or a plain note if it has none.
-func renderRequestDetail(pr ghclient.PRStatus) string {
+func renderRequestDetail(pr ghclient.PRStatus, currentUser string) string {
 	labelStyle := lipgloss.NewStyle().Faint(true).Width(10)
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "%s\n\n", ui.SectionHeader(fmt.Sprintf("#%d  [%s]  %s", pr.Number, parseResourceType(pr.Body), pr.Title)))
 	fmt.Fprintf(&b, "%s %s\n", labelStyle.Render("Status:"), statusLabel(pr.State))
+	if pr.Author != currentUser {
+		fmt.Fprintf(&b, "%s %s\n", labelStyle.Render("By:"), pr.Author)
+	}
 	fmt.Fprintf(&b, "%s %s\n", labelStyle.Render("Repo:"), pr.Repo)
 	fmt.Fprintf(&b, "%s %s\n\n", labelStyle.Render("URL:"), hyperlink(pr.URL))
 
