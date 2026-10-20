@@ -184,6 +184,7 @@ type Field struct {
 	Validate     string   `toml:"validate"` // "unique" — checks target repo for conflicts
 	Placeholder  string   `toml:"placeholder"`
 	Optional     bool     `toml:"optional"`      // if true, field may be left blank; use {{if .field}} in templates
+	SkipLabel    string   `toml:"skip_label"`    // text of an optional select's "none of these" choice (default "— skip —"); can use earlier answers
 	StripPrefix  string   `toml:"strip_prefix"`  // remove this prefix from dynamically sourced option values
 	FilterPrefix string   `toml:"filter_prefix"` // only include options that start with this prefix
 	FilterSuffix string   `toml:"filter_suffix"` // only include options that end with this suffix

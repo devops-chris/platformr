@@ -440,6 +440,7 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 		// default and placeholder can use earlier answers: default = "{{.current_version}}".
 		field.Default = template.RenderString(field.Default, values, remote.MapsFor(resource, repos))
 		field.Placeholder = template.RenderString(field.Placeholder, values, remote.MapsFor(resource, repos))
+		field.SkipLabel = template.RenderString(field.SkipLabel, values, remote.MapsFor(resource, repos))
 
 		// Change requests: start key questions on the value in the file, and fill
 		// list questions with what's there.

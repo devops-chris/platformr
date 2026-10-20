@@ -63,3 +63,12 @@ func TestMultiSelectSkipIfEmpty(t *testing.T) {
 		t.Error("empty and required should be an error")
 	}
 }
+
+func TestSkipText(t *testing.T) {
+	if got := SkipText(config.Field{Optional: true}); got != "— skip —" {
+		t.Errorf("default = %q", got)
+	}
+	if got := SkipText(config.Field{Optional: true, SkipLabel: "prod (this account's own, no folder)"}); got != "prod (this account's own, no folder)" {
+		t.Errorf("skip_label = %q", got)
+	}
+}

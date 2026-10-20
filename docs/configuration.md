@@ -706,7 +706,23 @@ worth flagging, which is usually the most useful thing to read first.
 
 Mark a field `optional = true` to allow it to be left blank. Input fields show
 an `(optional)` label; select fields show a `— skip —` option at the top.
-Use `{{if .field}}...{{end}}` in templates to omit blocks when the field is empty:
+Use `{{if .field}}...{{end}}` in templates to omit blocks when the field is empty.
+
+When "none of these" has a real meaning, say it with **`skip_label`** instead of
+`— skip —`. It can use earlier answers. Choosing it still gives an empty answer:
+
+```toml
+# In an account with environment folders, "none" means the account's own environment
+[[resources.fields]]
+name          = "env_folder"
+type          = "select"
+label         = "Environment"
+source        = "dirs:cloud/aws/{{.account}}"
+optional      = true
+skip_label    = "{{if contains \"-prod-\" .account}}prod{{else}}this account's own{{end}} (no folder)"
+```
+
+Example:
 
 ```toml
 [[resources.fields]]

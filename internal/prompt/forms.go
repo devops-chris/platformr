@@ -68,21 +68,23 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 		return promptInput(label, field)
 	}
 
+	hopts := toHuhOptions(options)
 	if field.Optional {
-		options = append([]string{"— skip —"}, options...)
+		// The "none of these" choice: its own value, so its text can't clash with an option.
+		hopts = append([]huh.Option[string]{huh.NewOption(SkipText(field), skipValue)}, hopts...)
 	}
 
 	if field.AllowManual {
-		options = append(options, ManualEntryOption)
+		hopts = append(hopts, huh.NewOption(ManualEntryOption, ManualEntryOption))
 	}
 
 	// Start on the default (for change requests, the current value) when it's listed.
 	val := field.Default
 	sel := huh.NewSelect[string]().
 		Title(label).
-		Options(toHuhOptions(options)...).
+		Options(hopts...).
 		Value(&val)
-	long := len(options) > listRows
+	long := len(hopts) > listRows
 	if long {
 		sel.Description(searchHint)
 	}
@@ -93,10 +95,22 @@ func promptSelect(label string, field config.Field, ctx *FieldContext) (string, 
 	if err := sel.Run(); err != nil {
 		return "", err
 	}
-	if val == "— skip —" {
+	if val == skipValue {
 		return "", nil
 	}
 	return val, nil
+}
+
+// skipValue is what an optional select's "none of these" choice stands for (an empty answer).
+const skipValue = "\x00skip"
+
+// SkipText is the text of an optional select's "none of these" choice: skip_label (with
+// earlier answers already filled in by the caller), or "— skip —".
+func SkipText(field config.Field) string {
+	if field.SkipLabel != "" {
+		return field.SkipLabel
+	}
+	return "— skip —"
 }
 
 func promptInput(label string, field config.Field) (string, error) {
