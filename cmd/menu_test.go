@@ -46,20 +46,20 @@ func TestWalkMenu(t *testing.T) {
 		asked   string
 	}{
 		{"straight through", []string{"Kubernetes", "change", "eks-upgrade"}, "eks-upgrade",
-			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||Kubernetes: change an existing one|back|"},
+			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||Kubernetes: change something that already exists|back|"},
 		{"a single request is still shown, with Back", []string{"Database", "rds"}, "rds",
-			"What do you need?|noback|Network|Database: create a new one|back|"},
+			"What do you need?|noback|Network|Database: create something new|back|"},
 		{"back from a single-request list", []string{"Database", "BACK", "Kubernetes", "change", "eks-upgrade"}, "eks-upgrade",
-			"What do you need?|noback|Network|Database: create a new one|back||What do you need?|noback|Database|Kubernetes: what do you want to do?|back||Kubernetes: change an existing one|back|"},
+			"What do you need?|noback|Network|Database: create something new|back||What do you need?|noback|Database|Kubernetes: what do you want to do?|back||Kubernetes: change something that already exists|back|"},
 		{"back from new/change to the thing, starting on the last pick",
 			[]string{"Kubernetes", "BACK", "Network", "twingate"}, "twingate",
-			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||What do you need?|noback|Kubernetes|Network: create a new one|back|"},
+			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||What do you need?|noback|Kubernetes|Network: create something new|back|"},
 		{"back from the list skips the unasked new/change step",
 			[]string{"Network", "BACK", "Database", "rds"}, "rds",
-			"What do you need?|noback|Network|Network: create a new one|back||What do you need?|noback|Network|Database: create a new one|back|"},
+			"What do you need?|noback|Network|Network: create something new|back||What do you need?|noback|Network|Database: create something new|back|"},
 		{"back from the list to new/change, starting on the last pick",
 			[]string{"Kubernetes", "create", "BACK", "change", "eks-upgrade"}, "eks-upgrade",
-			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||Kubernetes: create a new one|back||Kubernetes: what do you want to do?|back|create|Kubernetes: change an existing one|back|"},
+			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||Kubernetes: create something new|back||Kubernetes: what do you want to do?|back|create|Kubernetes: change something that already exists|back|"},
 	}
 	// "create" in Kubernetes has one request, so it's picked without a list; use a second one
 	// for the back-from-list case.

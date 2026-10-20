@@ -541,8 +541,9 @@ description  = "Create a new platform project"
 
 ## The request menu: categories and actions
 
-The menu asks about the **thing** first, then whether you're making a new one or
-changing one that's already there, then which request:
+The menu asks about the **group** first (a kind of thing like Kubernetes, or an audience
+like Platform team), then whether you're creating something new or changing something
+that already exists, then which request:
 
 ```
 ? What do you need?
@@ -550,9 +551,9 @@ changing one that's already there, then which request:
     Kubernetes      EKS clusters
     Platform team   Accounts and account-wide setup
 ? Kubernetes: what do you want to do?
-  > Create a new one
-    Change an existing one
-? Kubernetes: change an existing one
+  > Create something new
+    Change something that already exists
+? Kubernetes: change something that already exists
   > Upgrade its Kubernetes version
     Scale its node group
 ```
@@ -611,7 +612,7 @@ its settings (templates for new files, `update_file` for changes; see
 removing a resource stays a hand-made PR.
 
 `platformr catalog` uses the same order and splits each category into
-"Create a new one" and "Change an existing one".
+"Create something new" and "Change something that already exists".
 
 ---
 

@@ -127,11 +127,11 @@ func printResourceList(resources []config.Resource, categories []config.Category
 			printGroup("", creates)
 			continue
 		}
-		printGroup("Create a new one", creates)
+		printGroup("Create something new", creates)
 		if len(creates) > 0 {
 			fmt.Println()
 		}
-		printGroup("Change an existing one", changes)
+		printGroup("Change something that already exists", changes)
 	}
 
 	fmt.Printf("\n  %s\n\n",

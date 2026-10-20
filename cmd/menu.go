@@ -69,8 +69,8 @@ func walkMenu(all []config.Resource, categories []config.CategoryConfig, ask ask
 			switch {
 			case askKind:
 				v, err := ask(category+": what do you want to do?", []menuOption{
-					{"Create a new one", "", create},
-					{"Change an existing one", "update something already there", change},
+					{"Create something new", "", create},
+					{"Change something that already exists", "", change},
 				}, askCategory, kind)
 				if errors.Is(err, errBack) {
 					step = 0
@@ -88,9 +88,9 @@ func walkMenu(all []config.Resource, categories []config.CategoryConfig, ask ask
 			step = 2
 
 		case 2: // the request
-			list, title := creates, category+": create a new one"
+			list, title := creates, category+": create something new"
 			if kind == change {
-				list, title = changes, category+": change an existing one"
+				list, title = changes, category+": change something that already exists"
 			}
 			// A single request is still shown once an earlier step was asked, so the person
 			// sees what they're starting and can go back. Picked silently only when the
