@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -318,5 +319,21 @@ func TestReadFromRefWhenNotOnBase(t *testing.T) {
 	_, _, err = sess.apply(r, map[string]string{"cidr": "203.0.113.10/32"})
 	if err == nil || !strings.Contains(err.Error(), "only exists on my-branch") {
 		t.Errorf("want refusal, got %v", err)
+	}
+}
+
+func TestFreeBranch(t *testing.T) {
+	taken := map[string]bool{"platformr/x": true, "platformr/x-2": true}
+	got, err := freeBranch("platformr/x", func(b string) (bool, error) { return taken[b], nil })
+	if err != nil || got != "platformr/x-3" {
+		t.Errorf("got %q, %v; want platformr/x-3", got, err)
+	}
+	got, _ = freeBranch("platformr/new", func(b string) (bool, error) { return taken[b], nil })
+	if got != "platformr/new" {
+		t.Errorf("free base: got %q", got)
+	}
+	stop := errors.New("open request")
+	if _, err := freeBranch("platformr/x", func(string) (bool, error) { return true, stop }); !errors.Is(err, stop) {
+		t.Errorf("an error from taken should stop: %v", err)
 	}
 }

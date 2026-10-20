@@ -690,6 +690,17 @@ worth flagging, which is usually the most useful thing to read first.
 
 ---
 
+### PR branches
+
+Each PR's branch is `platformr/<request>-<target>`, e.g.
+`platformr/vpc-cloud-aws-acme-dev-use1-vpc-main`. If that name is already taken,
+because a merged request left its branch behind or another request shares the same
+target (two environments added to one account), platformr uses `-2`, `-3`, … instead.
+Change requests stop instead if an open request is already changing the same file,
+since a second change would start from out-of-date values.
+
+---
+
 ## Fields
 
 ### Field types

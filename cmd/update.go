@@ -361,20 +361,32 @@ func toMatch(v any, render func(string) string) (map[string]string, error) {
 // from out-of-date values). A leftover branch from a merged request gets a suffix.
 func updateBranch(gh *ghclient.Client, resource config.Resource, files []ghclient.PRFile) (string, error) {
 	base := fmt.Sprintf("platformr/%s-%s", resource.Name, slugify(files[0].Path))
+	return freeBranch(base, func(branch string) (bool, error) {
+		exists, err := gh.BranchExists(resource.Resolved.Repo, branch)
+		if err != nil || !exists {
+			return exists, err
+		}
+		if url, open, err := gh.OpenPRForBranch(resource.Resolved.Repo, branch); err == nil && open {
+			return true, fmt.Errorf("there's already an open request changing %s: %s\nWait for it to be merged or closed, then try again — otherwise this change would start from out-of-date values", files[0].Path, url)
+		}
+		return true, nil
+	})
+}
+
+// freeBranch returns base, or base-2, base-3, … : the first name taken reports false.
+// taken may also return an error to stop (e.g. an open request already changing the file).
+func freeBranch(base string, taken func(string) (bool, error)) (string, error) {
 	for n := 1; n <= 20; n++ {
 		branch := base
 		if n > 1 {
 			branch = fmt.Sprintf("%s-%d", base, n)
 		}
-		exists, err := gh.BranchExists(resource.Resolved.Repo, branch)
+		used, err := taken(branch)
 		if err != nil {
 			return "", err
 		}
-		if !exists {
+		if !used {
 			return branch, nil
-		}
-		if url, open, err := gh.OpenPRForBranch(resource.Resolved.Repo, branch); err == nil && open {
-			return "", fmt.Errorf("there's already an open request changing %s: %s\nWait for it to be merged or closed, then try again — otherwise this change would start from out-of-date values", files[0].Path, url)
 		}
 	}
 	return "", fmt.Errorf("too many old branches named %s-* — delete some merged ones", base)

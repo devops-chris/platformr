@@ -305,9 +305,17 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	_ = spinner.New().
 		Title("Opening PR...").
 		Action(func() {
+			// Two requests can share a base name (e.g. two environments added to one
+			// account), and merged requests leave their branch behind: take the first free one.
+			branch, err := freeBranch(fmt.Sprintf("platformr/%s-%s", resource.Name, resolveSlug(resource, values)),
+				func(b string) (bool, error) { return gh.BranchExists(resource.Resolved.Repo, b) })
+			if err != nil {
+				prErr = err
+				return
+			}
 			prURL, prErr = ghWrite.CreatePR(ghclient.PRRequest{
 				Repo:          resource.Resolved.Repo,
-				Branch:        fmt.Sprintf("platformr/%s-%s", resource.Name, resolveSlug(resource, values)),
+				Branch:        branch,
 				BaseBranch:    resource.Resolved.BaseBranch,
 				Title:         template.RenderString(resource.PRTitle, values, remote.MapsFor(resource, repos)),
 				Body:          buildPRBody(resource.Name, values, comment, template.RenderString(resource.Instructions, values, remote.MapsFor(resource, repos)), changesMarkdown(editChanges)+outputSectionMarkdown(resource, values, repos)),
