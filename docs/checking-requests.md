@@ -10,13 +10,22 @@ $ platformr status
 
   Your requests  sam — 1 open, 2 merged
 
+    New S3 bucket                    2  (1 open)
+    New Aurora PostgreSQL database   1
+
 ? Find a request
   Press / then type to search — e.g. a resource type, a word from its title, a PR number, or a login.
-> s3-bucket  #42  Open             Add S3 bucket orders-exports
-  rds        #39  Merged  ✓ outputs Add RDS instance billing-db
-  s3-bucket  #31  Merged  ✓ outputs Add S3 bucket ml-artifacts
+> s3-bucket  #42  Open             orders-exports · prod/use1
+  rds        #39  Merged  ✓ outputs billing-db · prod/use1
+  s3-bucket  #31  Merged  ✓ outputs ml-artifacts · dev/use1
   — skip —
 ```
+
+Above the list is a count of each kind of request, using the names from the
+request menu. Each row starts with the request type and ends with what
+identifies that one request. The platform team picks those values per request
+type with [`status_fields`](configuration.md#status_fields-what-identifies-a-request-in-platformr-status).
+Request types without it show the PR title.
 
 `✓ outputs` marks requests that list output values (`output_path` in the
 [configuration reference](configuration.md)). If `lockr` is installed, you can
@@ -59,11 +68,15 @@ $ platformr status -e
   All requests — 3 open, 5 merged
   Showing the 20 most recent — add search words to narrow, or -a for the full history.
 
+    New Aurora PostgreSQL database   3  (2 open)
+    New S3 bucket                    2  (1 open)
+    ...
+
 ? Find a request
-> s3-bucket  #42  sam    Open             Add S3 bucket orders-exports
-  eks        #41  alex   Open             Upgrade cluster apps to 1.33
-  rds        #40  priya  Open             Add RDS instance search-db
-  rds        #39  sam    Merged  ✓ outputs Add RDS instance billing-db
+> s3-bucket  #42  sam    Open             orders-exports · prod/use1
+  eks        #41  alex   Open             apps · 1.33
+  rds        #40  priya  Open             search-db · dev/use1
+  rds        #39  sam    Merged  ✓ outputs billing-db · prod/use1
   ...
 ```
 

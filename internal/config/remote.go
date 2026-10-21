@@ -92,6 +92,10 @@ type Resource struct {
 	TeamReviewers    []string             `toml:"team_reviewers"` // GitHub team slugs auto-requested on every PR for this resource
 	Fields           []Field              `toml:"fields"`
 	TemplateFiles    []TemplateFileConfig `toml:"template_files"` // per-file metadata for multi-file mode
+	// StatusFields names the fields whose answers identify a request at a glance
+	// in `platformr status` (e.g. ["account", "where"] → "my-account · qa/use1"),
+	// read back from the PR's Details. Unset, status shows the PR title instead.
+	StatusFields []string `toml:"status_fields"`
 	// OutputPath is a platform-team-asserted contract, not something derived from the
 	// template: "once applied, outputs for this resource will be written under this path."
 	// Supports {{.field}} interpolation like TargetPath. IaC-agnostic and backend-agnostic —

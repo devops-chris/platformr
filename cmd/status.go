@@ -96,12 +96,13 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	gh := ghclient.New(token)
 
 	var orgCfg *config.OrgConfig
+	var repoCfgs []*config.RepoConfig
 	var currentUser string
 	var loadErr error
 	_ = spinner.New().
 		Title("Loading org config...").
 		Action(func() {
-			orgCfg, _, loadErr = loader.LoadAll(localCfg.ConnectedOrg)
+			orgCfg, repoCfgs, loadErr = loader.LoadAll(localCfg.ConnectedOrg)
 			if loadErr != nil {
 				return
 			}
@@ -185,10 +186,68 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		prs = prs[:defaultStatusLimit]
 	}
 
-	printStatusSummary(author, currentUser, prs, mayHaveMore)
+	resources := requestResources(repoCfgs)
+	printStatusSummary(author, currentUser, prs, resources, mayHaveMore)
 	// In the everyone view, always say who opened each request — even when the
 	// results happen to all be one person's, that's exactly what's being asked.
-	return offerRequestPicker(prs, currentUser, author == "")
+	return offerRequestPicker(prs, resources, currentUser, author == "")
+}
+
+// requestResources maps "owner/repo\x00name" to each request's current config,
+// for the display name and status_fields of requests status lists. Keyed by the
+// repo the PR was opened in (where the request's files land), since request names
+// are only unique within one repo's config.
+func requestResources(repos []*config.RepoConfig) map[string]config.Resource {
+	out := map[string]config.Resource{}
+	for _, res := range remote.AllResources(repos) {
+		out[strings.ToLower(res.Resolved.Repo)+"\x00"+res.Name] = res
+	}
+	return out
+}
+
+// requestInfo returns pr's request type (the name in its "## <name> request"
+// heading), that request's current config, and whether it still exists — a PR
+// is permanent, but the request that opened it may since have been renamed or
+// removed, in which case callers fall back to the bare name and the PR title.
+func requestInfo(pr ghclient.PRStatus, resources map[string]config.Resource) (string, config.Resource, bool) {
+	name := parseResourceType(pr.Body)
+	res, ok := resources[strings.ToLower(pr.Repo)+"\x00"+name]
+	return name, res, ok
+}
+
+// requestLabel is the display name for pr's request type, or its bare name if
+// that request no longer exists or has no display_name.
+func requestLabel(pr ghclient.PRStatus, resources map[string]config.Resource) string {
+	name, res, ok := requestInfo(pr, resources)
+	if !ok {
+		return name
+	}
+	return res.Label()
+}
+
+// requestSummary is what identifies pr in the list: the answers to its
+// request's status_fields (from the PR's Details), joined with " · ", or the PR
+// title when status_fields isn't set, the request no longer exists, or none of
+// those fields has an answer in this PR.
+func requestSummary(pr ghclient.PRStatus, resources map[string]config.Resource) string {
+	_, res, ok := requestInfo(pr, resources)
+	if !ok || len(res.StatusFields) == 0 {
+		return pr.Title
+	}
+	details := map[string]string{}
+	for _, kv := range parseDetails(pr.Body) {
+		details[kv[0]] = kv[1]
+	}
+	var parts []string
+	for _, f := range res.StatusFields {
+		if v := details[f]; v != "" {
+			parts = append(parts, v)
+		}
+	}
+	if len(parts) == 0 {
+		return pr.Title
+	}
+	return strings.Join(parts, " · ")
 }
 
 // searchQuery joins status's search words into GitHub search free text. The
@@ -214,7 +273,7 @@ func searchQuery(args []string) string {
 //
 // author is whose requests were searched for ("" for everyone); currentUser
 // decides whether that reads as "Your requests" or someone else's.
-func printStatusSummary(author, currentUser string, prs []ghclient.PRStatus, mayHaveMore bool) {
+func printStatusSummary(author, currentUser string, prs []ghclient.PRStatus, resources map[string]config.Resource, mayHaveMore bool) {
 	open, merged, closed := 0, 0, 0
 	for _, pr := range prs {
 		switch pr.State {
@@ -249,6 +308,48 @@ func printStatusSummary(author, currentUser string, prs []ghclient.PRStatus, may
 		fmt.Println(ui.Subtle(fmt.Sprintf("  Showing %s %d most recent — add search words to narrow, or -a for the full history.", whose, len(prs))))
 	}
 	fmt.Println()
+	printTypeBreakdown(prs, resources)
+}
+
+// printTypeBreakdown is the at-a-glance "what": how many of the listed
+// requests are of each kind, by display name, most common first, with how many
+// of each are still open.
+func printTypeBreakdown(prs []ghclient.PRStatus, resources map[string]config.Resource) {
+	type tally struct {
+		label       string
+		total, open int
+	}
+	byLabel := map[string]*tally{}
+	var order []*tally
+	for _, pr := range prs {
+		label := requestLabel(pr, resources)
+		t := byLabel[label]
+		if t == nil {
+			t = &tally{label: label}
+			byLabel[label] = t
+			order = append(order, t)
+		}
+		t.total++
+		if pr.State == "open" {
+			t.open++
+		}
+	}
+	sort.SliceStable(order, func(i, j int) bool { return order[i].total > order[j].total })
+
+	width := 0
+	for _, t := range order {
+		if w := len(t.label); w > width {
+			width = w
+		}
+	}
+	for _, t := range order {
+		line := fmt.Sprintf("    %-*s  %d", width, t.label, t.total)
+		if t.open > 0 {
+			line += "  " + ui.Warning(fmt.Sprintf("(%d open)", t.open))
+		}
+		fmt.Println(line)
+	}
+	fmt.Println()
 }
 
 // offerRequestPicker is the one place requests are listed — searchable via huh's
@@ -261,7 +362,7 @@ func printStatusSummary(author, currentUser string, prs []ghclient.PRStatus, may
 // hardcoded field name that not every resource or IaC tool will have.
 // Selecting shows a styled detail view with status and outputs together, since
 // checking either is the actual reason to look this up.
-func offerRequestPicker(prs []ghclient.PRStatus, currentUser string, showAuthor bool) error {
+func offerRequestPicker(prs []ghclient.PRStatus, resources map[string]config.Resource, currentUser string, showAuthor bool) error {
 	// PR numbers are only unique per-repo — a requestor may not even be aware
 	// there's more than one registered IaC repo. Only disambiguate when it's
 	// actually ambiguous, so the common single-repo case stays uncluttered.
@@ -315,7 +416,7 @@ func offerRequestPicker(prs []ghclient.PRStatus, currentUser string, showAuthor 
 			authorPart = fmt.Sprintf("%-*s  ", authorWidth, pr.Author)
 		}
 		label := fmt.Sprintf("%-*s  #%-*d  %s%s%s  %s  %s",
-			typeWidth, parseResourceType(pr.Body), numWidth, pr.Number, repoPart, authorPart, statusLabel(pr.State), marker, pr.Title)
+			typeWidth, parseResourceType(pr.Body), numWidth, pr.Number, repoPart, authorPart, statusLabel(pr.State), marker, requestSummary(pr, resources))
 		opts[i] = huh.NewOption(label, i)
 	}
 	opts = append(opts, huh.NewOption("— skip —", -1))
@@ -334,7 +435,7 @@ func offerRequestPicker(prs []ghclient.PRStatus, currentUser string, showAuthor 
 		return nil
 	}
 
-	fmt.Println(renderRequestDetail(prs[selected], currentUser))
+	fmt.Println(renderRequestDetail(prs[selected], resources, currentUser))
 	return offerValueReveal(prs[selected])
 }
 
@@ -397,11 +498,16 @@ func offerValueReveal(pr ghclient.PRStatus) error {
 // renderRequestDetail builds a styled, bordered detail box for one request —
 // its status, URL, and outputs (rendered as clean key/value lines, not the raw
 // markdown they're stored as in the PR body) or a plain note if it has none.
-func renderRequestDetail(pr ghclient.PRStatus, currentUser string) string {
+func renderRequestDetail(pr ghclient.PRStatus, resources map[string]config.Resource, currentUser string) string {
 	labelStyle := lipgloss.NewStyle().Faint(true).Width(10)
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "%s\n\n", ui.SectionHeader(fmt.Sprintf("#%d  [%s]  %s", pr.Number, parseResourceType(pr.Body), pr.Title)))
+	heading := fmt.Sprintf("#%d  %s", pr.Number, requestLabel(pr, resources))
+	if name := parseResourceType(pr.Body); name != requestLabel(pr, resources) {
+		heading += "  " + ui.Subtle("("+name+")")
+	}
+	fmt.Fprintf(&b, "%s\n\n", ui.SectionHeader(heading))
+	fmt.Fprintf(&b, "%s %s\n", labelStyle.Render("Title:"), pr.Title)
 	fmt.Fprintf(&b, "%s %s\n", labelStyle.Render("Status:"), statusLabel(pr.State))
 	if pr.Author != currentUser {
 		fmt.Fprintf(&b, "%s %s\n", labelStyle.Render("By:"), pr.Author)

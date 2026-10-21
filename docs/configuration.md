@@ -537,6 +537,30 @@ description  = "Create a new platform project"
   **Platform Project** `(platform-project)` so the slug is still discoverable
 - Falls back to `name` when `display_name` is not set
 
+### `status_fields` — what identifies a request in `platformr status`
+
+Each row in `platformr status` needs to say *which* one this is, not just what
+kind. By default that's the PR title. To show specific answers instead, list
+the fields that matter:
+
+```toml
+[[resources]]
+name          = "account-location"
+display_name  = "Add an environment or region to an account"
+status_fields = ["account", "where"]
+```
+
+```
+account-location  #289  Merged  pt-well-iq-dev-services · qa/use1
+```
+
+- Values are read from the PR's Details section, so this works for PRs opened
+  before you added the setting, too.
+- Fields with no answer are skipped. If none have one, or `status_fields` isn't
+  set, the PR title shows instead.
+- Pick the fields people would use to tell two requests of this kind apart,
+  usually the name and where it lives, not derived values.
+
 ---
 
 ## The request menu: categories and actions
