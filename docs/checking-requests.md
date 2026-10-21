@@ -24,24 +24,40 @@ reveal one of them right there.
 
 ---
 
-## Someone else's requests
+## The flags
 
-By default you only see PRs **you** opened. Two flags widen that:
+`status` answers two separate questions, and each has its own flags:
 
-| Command | Shows |
-|---|---|
-| `platformr status` | Your requests |
-| `platformr status --user alex` | Requests opened by the GitHub user `alex` |
-| `platformr status --everyone` | Requests opened by anyone |
+| Question | Default | Change it with |
+|---|---|---|
+| **Whose** requests? | yours | `-u <login>` for one person, `-e` for everyone |
+| **Which** requests? | the 20 most recent open or merged | `-a` for the full history, including closed |
 
-Use them to check whether a teammate already asked for the same thing before you
-open a duplicate. A platform engineer can use them to see what's in flight:
+Add **search words** to narrow either one. Everything combines:
 
 ```
-$ platformr status --everyone
+platformr status                 # your 20 most recent requests
+platformr status -a              # all of yours, including closed
+platformr status -e              # everyone's 20 most recent
+platformr status -e orders       # everyone's requests mentioning "orders"
+platformr status -u alex rds     # alex's requests mentioning "rds"
+platformr status -e -a orders    # every request ever that mentions "orders"
+```
+
+`platformr status --help` shows the same summary.
+
+---
+
+## Someone else's requests
+
+Use `-e` to check whether a teammate already asked for the same thing before
+you open a duplicate. A platform engineer can use it to see what's in flight:
+
+```
+$ platformr status -e
 
   All requests — 3 open, 5 merged
-  Showing the 20 most recent — add --all for the full history.
+  Showing the 20 most recent — add search words to narrow, or -a for the full history.
 
 ? Find a request
 > s3-bucket  #42  sam    Open             Add S3 bucket orders-exports
@@ -51,12 +67,9 @@ $ platformr status --everyone
   ...
 ```
 
-When the list mixes people, each row shows who opened it, and the detail view
-adds a **By:** line. Press `/` and type a login to narrow the list to one person,
-the same way you'd search by resource type or title.
-
-`--user` and `--everyone` can't be used together. Either one combines with
-`--all`.
+With `-e`, every row shows who opened it, and the detail view adds a **By:**
+line. With `-u alex`, the heading says whose list it is ("alex's requests").
+`-u` and `-e` can't be used together.
 
 ### What you can see
 
@@ -70,23 +83,32 @@ database password stays out of reach unless your role can read it anyway.
 
 ---
 
-## Limits and history
+## When there are a lot of requests
 
-- By default you get the **20 most recent** open and merged requests.
-  Closed-without-merge requests are hidden, since those are abandoned.
-- `--all` includes closed requests and removes the 20-request limit.
+An org can build up hundreds of requests. Three things keep the list usable:
 
-```
-platformr status --all
-platformr status --everyone --all
-```
+1. **The 20 most recent are shown by default.** The summary line tells you when
+   there are more.
+2. **Search words are sent to GitHub's search,** which matches them against each
+   request's title and details (account, name, region, and so on). Only matching
+   requests are downloaded, so `platformr status -e -a orders` stays fast however
+   much history exists. Several words must all match; put quotes around an exact
+   phrase (`status -e "billing db"`).
+3. **Inside the list, press `/`** and type to filter what's already shown, by
+   resource type, title, PR number, or login.
+
+So the usual pattern: start broad (`status -e`). If the request you want isn't
+in the 20 shown, add a word (`status -e billing`), and add `-a` if it might be old
+or closed.
+
+---
 
 ## How requests are found
 
 Every PR platformr opens gets a `platformr` label. `status` runs a GitHub search
 per registered IaC repo for PRs with that label, plus `author:<login>` unless
-you passed `--everyone`. Filtering happens on GitHub's side, so platformr never
-downloads a repo's full PR list. Nothing is stored locally: status always comes
+you passed `-e`, plus any search words you gave. Filtering happens on GitHub's
+side, so platformr never downloads a repo's full PR list. Nothing is stored locally: status always comes
 live from GitHub, so a PR merged a minute ago already shows as merged.
 
 PRs opened by hand without the `platformr` label don't show up. If you remove

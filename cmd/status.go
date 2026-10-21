@@ -51,26 +51,36 @@ var (
 )
 
 var statusCmd = &cobra.Command{
-	Use:   "status",
+	Use:   "status [search words]",
 	Short: "Check the status of your requests (or anyone's)",
-	Long: `Checks the IaC repos in your connected org for pull requests you opened via
-` + "`platformr request`" + ` and reports whether each is open or merged.
-Closed-without-merge requests are hidden by default — pass --all to see them too.
+	Long: `Lists requests opened via ` + "`platformr request`" + ` and whether each is open or
+merged, newest first. Pick one to see its details and outputs.
 
-Pass --user <login> to see someone else's requests, or --everyone to see all of
-them — e.g. to check whether a teammate already requested something. You'll see
-whatever the repos' read access already lets you see on GitHub; revealing an
-output value still goes through lockr and your own cloud permissions.`,
-	Args: cobra.NoArgs,
+Two separate questions, two separate flags:
+  WHOSE requests:  yours by default, -u <login> for one person, -e for everyone
+  WHICH requests:  the 20 most recent open/merged by default, -a for the full
+                   history including closed-without-merge
+
+Search words narrow the list on GitHub's side (matched against each request's
+title and details), so it stays fast however many requests exist.
+
+You see whatever your GitHub read access to the IaC repos already shows you.
+Revealing an output value still goes through lockr and your own cloud permissions.`,
+	Example: `  platformr status                 # your 20 most recent requests
+  platformr status -a              # all of yours, including closed
+  platformr status -e              # everyone's 20 most recent
+  platformr status -e orders       # everyone's requests mentioning "orders"
+  platformr status -u alex rds     # alex's requests mentioning "rds"`,
+	Args: cobra.ArbitraryArgs,
 	RunE: runStatus,
 }
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
-	statusCmd.Flags().BoolVar(&statusAll, "all", false, fmt.Sprintf(
-		"Show every request, including closed-without-merge, with no count limit (default: open + merged only, most recent %d)", defaultStatusLimit))
-	statusCmd.Flags().StringVar(&statusUser, "user", "", "Show requests opened by this GitHub login instead of your own")
-	statusCmd.Flags().BoolVar(&statusEveryone, "everyone", false, "Show requests opened by anyone, not just you")
+	statusCmd.Flags().BoolVarP(&statusAll, "all", "a", false, fmt.Sprintf(
+		"Full history: include closed-without-merge and drop the %d-request limit", defaultStatusLimit))
+	statusCmd.Flags().StringVarP(&statusUser, "user", "u", "", "Show this GitHub login's requests instead of yours")
+	statusCmd.Flags().BoolVarP(&statusEveryone, "everyone", "e", false, "Show everyone's requests, not just yours")
 	statusCmd.MarkFlagsMutuallyExclusive("user", "everyone")
 }
 
@@ -129,6 +139,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	} else if statusEveryone {
 		author = ""
 	}
+	search := searchQuery(args)
 
 	var prs []ghclient.PRStatus
 	var mayHaveMore bool
@@ -137,7 +148,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		Title("Checking PR status...").
 		Action(func() {
 			for repo := range targetRepos {
-				repoPRs, err := gh.RequestPRs(repo, author, perRepoLimit, statusAll)
+				repoPRs, err := gh.RequestPRs(repo, author, search, perRepoLimit, statusAll)
 				if err != nil {
 					fetchErr = err
 					return
@@ -156,11 +167,14 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(prs) == 0 {
-		if author == "" {
-			fmt.Println(ui.Subtle("No requests found."))
-		} else {
-			fmt.Println(ui.Subtle("No requests found for " + author + "."))
+		msg := "No requests found"
+		if author != "" {
+			msg += " for " + author
 		}
+		if search != "" {
+			msg += " matching " + search
+		}
+		fmt.Println(ui.Subtle(msg + "."))
 		return nil
 	}
 
@@ -172,7 +186,24 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	printStatusSummary(author, currentUser, prs, mayHaveMore)
-	return offerRequestPicker(prs, currentUser)
+	// In the everyone view, always say who opened each request — even when the
+	// results happen to all be one person's, that's exactly what's being asked.
+	return offerRequestPicker(prs, currentUser, author == "")
+}
+
+// searchQuery joins status's search words into GitHub search free text. The
+// shell has already stripped any quotes, so an argument that still contains a
+// space was quoted on purpose (status -e "billing db") and is re-quoted to stay
+// an exact phrase rather than becoming two separate words.
+func searchQuery(args []string) string {
+	words := make([]string, len(args))
+	for i, a := range args {
+		if strings.ContainsAny(a, " \t") && !strings.Contains(a, `"`) {
+			a = `"` + a + `"`
+		}
+		words[i] = a
+	}
+	return strings.Join(words, " ")
 }
 
 // printStatusSummary prints one line of counts — no table. With more than a
@@ -215,7 +246,7 @@ func printStatusSummary(author, currentUser string, prs []ghclient.PRStatus, may
 	}
 	fmt.Printf("\n  %s%s — %s\n", ui.SectionHeader(heading), who, counts)
 	if mayHaveMore {
-		fmt.Println(ui.Subtle(fmt.Sprintf("  Showing %s %d most recent — add --all for the full history.", whose, len(prs))))
+		fmt.Println(ui.Subtle(fmt.Sprintf("  Showing %s %d most recent — add search words to narrow, or -a for the full history.", whose, len(prs))))
 	}
 	fmt.Println()
 }
@@ -230,13 +261,14 @@ func printStatusSummary(author, currentUser string, prs []ghclient.PRStatus, may
 // hardcoded field name that not every resource or IaC tool will have.
 // Selecting shows a styled detail view with status and outputs together, since
 // checking either is the actual reason to look this up.
-func offerRequestPicker(prs []ghclient.PRStatus, currentUser string) error {
+func offerRequestPicker(prs []ghclient.PRStatus, currentUser string, showAuthor bool) error {
 	// PR numbers are only unique per-repo — a requestor may not even be aware
 	// there's more than one registered IaC repo. Only disambiguate when it's
 	// actually ambiguous, so the common single-repo case stays uncluttered.
-	// Same reasoning for authors: only show who opened each request when the
-	// list actually mixes people (--everyone); otherwise the heading says whose.
-	multiRepo, multiAuthor := false, false
+	// Same reasoning for authors: show who opened each request when asked to
+	// (the everyone view) or when the list mixes people; otherwise the heading
+	// already says whose.
+	multiRepo, multiAuthor := false, showAuthor
 	for _, pr := range prs {
 		if pr.Repo != prs[0].Repo {
 			multiRepo = true

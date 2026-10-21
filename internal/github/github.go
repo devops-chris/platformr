@@ -344,9 +344,10 @@ type PRStatus struct {
 }
 
 // RequestPRs returns pull requests in repo labeled RequestLabel, newest first —
-// authored by author, or by anyone when author is "". Both filters go into the
-// GitHub search query, so only platformr PRs are ever fetched — not the whole
-// repo's PR list, which matters most when author is "" and nothing else narrows it.
+// authored by author, or by anyone when author is "", and matching search's free
+// text (title/body) when it isn't "". All of it goes into the GitHub search
+// query, so only matching platformr PRs are ever fetched — not the whole repo's
+// PR list, which matters most when author is "" and nothing else narrows it.
 //
 // maxResults bounds how many are fetched, stopping as soon as that many are
 // collected (results arrive newest-first, so this is a correct "N most recent",
@@ -367,11 +368,14 @@ type PRStatus struct {
 // response's own Labels field for that PR is already correct. Those stale
 // matches are extras, never omissions (platformr labels a PR as it opens it),
 // so the label is re-checked client-side against that field to drop them.
-func (c *Client) RequestPRs(repo, author string, maxResults int, includeClosed bool) ([]PRStatus, error) {
+func (c *Client) RequestPRs(repo, author, search string, maxResults int, includeClosed bool) ([]PRStatus, error) {
 	ctx := context.Background()
 	query := fmt.Sprintf("repo:%s is:pr label:%s", repo, RequestLabel)
 	if author != "" {
 		query += " author:" + author
+	}
+	if search != "" {
+		query += " " + search
 	}
 	opts := &gh.SearchOptions{
 		Sort:        "created",
