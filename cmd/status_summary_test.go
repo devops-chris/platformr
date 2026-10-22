@@ -43,3 +43,21 @@ func TestRequestSummaryAndLabel(t *testing.T) {
 		}
 	}
 }
+
+func TestLoginHint(t *testing.T) {
+	body := "## vpc request\n\n### Details\n\n- **account**: my-account\n- **where**: qa/use1\n"
+	pr := ghclient.PRStatus{Repo: "org/iac", Body: body}
+
+	res := config.Resource{Name: "vpc", LoginHint: "cloudctx {{.account}} ({{index .maps.ids .account}})"}
+	res.Resolved.Repo = "org/iac"
+	res.Resolved.TemplateRepo = "org/iac"
+	repos := []*config.RepoConfig{{RepoName: "org/iac", Resources: []config.Resource{res},
+		Maps: map[string]map[string]string{"ids": {"my-account": "123456789012"}}}}
+
+	if got, want := loginHint(pr, requestResources(repos), repos), "cloudctx my-account (123456789012)"; got != want {
+		t.Errorf("loginHint = %q, want %q", got, want)
+	}
+	if got := loginHint(pr, map[string]config.Resource{}, repos); got != "" {
+		t.Errorf("loginHint for a removed request = %q, want empty", got)
+	}
+}

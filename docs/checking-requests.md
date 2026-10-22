@@ -33,6 +33,31 @@ reveal one of them right there.
 
 ---
 
+## Revealing output values
+
+When you open a request that has outputs and `lockr` is installed, platformr
+offers to reveal one value. First it checks your access by listing the output
+folder through lockr. That only reads names; nothing is decrypted. So problems
+show up before you pick anything:
+
+| What you see | What it means |
+|---|---|
+| **You're not logged in to AWS, or your session has expired** | No usable credentials, e.g. an expired SSO session. Log in and run `status` again. |
+| **Nothing is stored under …** | You're logged in, but there's nothing at that path. Either the stack hasn't been applied yet, or you're in a different account or region than the request's. |
+| **(not there yet)** next to a key | The folder exists but that key doesn't. |
+
+Outputs live in the account (and region) the resource was created in, so you
+need to be logged in **there**. The Details section of the request shows which
+account that is. platformr never picks credentials or a role for you. When
+`AWS_PROFILE` is set, messages name it, so you can see which login was used.
+If your platform team set a [`login_hint`](configuration.md#login_hint-how-to-log-in-to-where-the-outputs-live),
+the message also says exactly how to log in, e.g. `To log in: cloudctx my-account`.
+
+Without `lockr` installed, you still see each output's path, with a note that
+installing lockr lets you reveal them from here.
+
+---
+
 ## The flags
 
 `status` answers two separate questions, and each has its own flags:

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -19,6 +20,7 @@ import (
 	"github.com/devops-chris/platformr/internal/config"
 	ghclient "github.com/devops-chris/platformr/internal/github"
 	"github.com/devops-chris/platformr/internal/remote"
+	"github.com/devops-chris/platformr/internal/template"
 	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 )
@@ -190,7 +192,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	printStatusSummary(author, currentUser, prs, resources, mayHaveMore)
 	// In the everyone view, always say who opened each request — even when the
 	// results happen to all be one person's, that's exactly what's being asked.
-	return offerRequestPicker(prs, resources, currentUser, author == "")
+	return offerRequestPicker(prs, resources, repoCfgs, currentUser, author == "")
 }
 
 // requestResources maps "owner/repo\x00name" to each request's current config,
@@ -362,7 +364,7 @@ func printTypeBreakdown(prs []ghclient.PRStatus, resources map[string]config.Res
 // hardcoded field name that not every resource or IaC tool will have.
 // Selecting shows a styled detail view with status and outputs together, since
 // checking either is the actual reason to look this up.
-func offerRequestPicker(prs []ghclient.PRStatus, resources map[string]config.Resource, currentUser string, showAuthor bool) error {
+func offerRequestPicker(prs []ghclient.PRStatus, resources map[string]config.Resource, repos []*config.RepoConfig, currentUser string, showAuthor bool) error {
 	// PR numbers are only unique per-repo — a requestor may not even be aware
 	// there's more than one registered IaC repo. Only disambiguate when it's
 	// actually ambiguous, so the common single-repo case stays uncluttered.
@@ -436,7 +438,7 @@ func offerRequestPicker(prs []ghclient.PRStatus, resources map[string]config.Res
 	}
 
 	fmt.Println(renderRequestDetail(prs[selected], resources, currentUser))
-	return offerValueReveal(prs[selected])
+	return offerValueReveal(prs[selected], loginHint(prs[selected], resources, repos))
 }
 
 // offerValueReveal lets the user fetch and reveal one specific output value
@@ -445,7 +447,11 @@ func offerRequestPicker(prs []ghclient.PRStatus, resources map[string]config.Res
 // anything sensitive, and per-key IAM permissions mean one key can succeed
 // while another is denied — attempting only the one actually asked for keeps
 // that independent instead of surfacing every outcome at once.
-func offerValueReveal(pr ghclient.PRStatus) error {
+//
+// Before offering anything, it lists the output folder through lockr (names
+// only, nothing decrypted) so an expired login, the wrong account, or a stack
+// that isn't applied yet is reported up front, instead of after picking a key.
+func offerValueReveal(pr ghclient.PRStatus, hint string) error {
 	if !lockrAvailable() {
 		return nil
 	}
@@ -458,9 +464,35 @@ func offerValueReveal(pr ghclient.PRStatus) error {
 		return nil
 	}
 
+	folder := path.Dir(kvs[0][2])
+	var existing map[string]bool
+	var listErr error
+	_ = spinner.New().
+		Title("Checking your access with lockr...").
+		Action(func() {
+			existing, listErr = lockrListNames(folder)
+		}).
+		Run()
+	if listErr != nil {
+		fmt.Println(lockrProblem(listErr, folder, hint))
+		return nil
+	}
+	if len(existing) == 0 {
+		fmt.Println(ui.Warning("Nothing is stored under " + folder + " where you're logged in" + awsProfileNote() + "."))
+		fmt.Println(ui.Subtle("  Either it hasn't been applied yet, or you're logged in to a different account or region than this request's (see Details above)."))
+		if hint != "" {
+			fmt.Println(ui.Subtle("  To log in where it lives: " + hint))
+		}
+		return nil
+	}
+
 	opts := make([]huh.Option[int], len(kvs))
 	for i, kv := range kvs {
-		opts[i] = huh.NewOption(kv[1], i)
+		label := kv[1]
+		if !existing[kv[2]] {
+			label += "  " + ui.Subtle("(not there yet)")
+		}
+		opts[i] = huh.NewOption(label, i)
 	}
 	opts = append(opts, huh.NewOption("— skip —", -1))
 
@@ -477,18 +509,18 @@ func offerValueReveal(pr ghclient.PRStatus) error {
 		return nil
 	}
 
-	key, path := kvs[selected][1], kvs[selected][2]
+	key, keyPath := kvs[selected][1], kvs[selected][2]
 	var value string
 	var fetchErr error
 	_ = spinner.New().
 		Title("Checking lockr...").
 		Action(func() {
-			value, fetchErr = lockrReadValue(path)
+			value, fetchErr = lockrReadValue(keyPath)
 		}).
 		Run()
 
 	if fetchErr != nil {
-		fmt.Println(ui.Warning(fmt.Sprintf("%s: %s", key, truncate(fetchErr.Error(), 80))))
+		fmt.Println(lockrProblem(fetchErr, keyPath, hint))
 		return nil
 	}
 	fmt.Println(ui.Success(fmt.Sprintf("%s → %s", key, value)))
@@ -550,6 +582,9 @@ func renderRequestDetail(pr ghclient.PRStatus, resources map[string]config.Resou
 			for _, kv := range kvs {
 				fmt.Fprintf(&b, "  %-14s %s\n", kv[1], kv[2])
 			}
+			if !lockrAvailable() {
+				fmt.Fprintf(&b, "\n  %s\n", ui.Subtle("Install lockr to reveal these values from here."))
+			}
 		} else if m := outputPrefixRe.FindStringSubmatch(section); m != nil {
 			b.WriteString(ui.SectionHeader(heading) + "\n\n")
 			if pr.State == "open" {
@@ -567,20 +602,9 @@ func renderRequestDetail(pr ghclient.PRStatus, resources map[string]config.Resou
 		Render(strings.TrimRight(b.String(), "\n"))
 }
 
-// truncate shortens s for single-line display, e.g. a verbose chained error
-// message from an external tool. Callers needing the full text (logs,
-// returned errors) should use the untruncated value instead.
-func truncate(s string, max int) string {
-	r := []rune(s)
-	if len(r) <= max {
-		return s
-	}
-	return string(r[:max-1]) + "…"
-}
-
 // lockrAvailable reports whether the lockr binary is on PATH. Fetching values
-// is entirely opt-in-by-presence: if lockr isn't installed, platformr just
-// shows the path, same as if this feature didn't exist at all.
+// is entirely opt-in-by-presence: if lockr isn't installed, platformr shows the
+// paths and a one-line hint that lockr would let you reveal them here.
 func lockrAvailable() bool {
 	_, err := exec.LookPath("lockr")
 	return err == nil
@@ -599,7 +623,44 @@ type lockrSecret struct {
 // denied, not applied yet, expired credentials, whatever it actually is)
 // rather than swallowing or reinterpreting it.
 func lockrReadValue(path string) (string, error) {
-	cmd := exec.Command("lockr", "read", path, "--output", "json")
+	out, err := runLockr("read", path, "--output", "json")
+	if err != nil {
+		return "", err
+	}
+	var secret lockrSecret
+	if err := json.Unmarshal(out, &secret); err != nil {
+		return "", fmt.Errorf("unexpected lockr output: %w", err)
+	}
+	return secret.Value, nil
+}
+
+// lockrListNames returns the names lockr finds directly under folder, via
+// `lockr list <folder> --output json` — metadata only, lockr doesn't decrypt
+// anything for a list, so this checks access without revealing a value. An
+// empty folder isn't an error: lockr prints a "No secrets found" line instead
+// of JSON, which comes back here as an empty set.
+func lockrListNames(folder string) (map[string]bool, error) {
+	out, err := runLockr("list", folder, "--output", "json")
+	if err != nil {
+		return nil, err
+	}
+	names := map[string]bool{}
+	var items []struct {
+		Name string `json:"name"`
+	}
+	if start := bytes.IndexByte(out, '['); start != -1 && json.Unmarshal(out[start:], &items) == nil {
+		for _, it := range items {
+			names[it.Name] = true
+		}
+	}
+	return names, nil
+}
+
+// runLockr runs lockr with args and returns its stdout. On failure the error is
+// lockr's own message, in full — the part of an AWS error that says what's
+// actually wrong is usually at the end.
+func runLockr(args ...string) ([]byte, error) {
+	cmd := exec.Command("lockr", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -611,13 +672,66 @@ func lockrReadValue(path string) (string, error) {
 		if lines := strings.SplitN(msg, "\n", 2); len(lines) > 0 && lines[0] != "" {
 			msg = strings.TrimPrefix(lines[0], "Error: ")
 		}
-		return "", fmt.Errorf("%s", msg)
+		return nil, fmt.Errorf("%s", msg)
 	}
-	var secret lockrSecret
-	if err := json.Unmarshal(stdout.Bytes(), &secret); err != nil {
-		return "", fmt.Errorf("unexpected lockr output: %w", err)
+	return stdout.Bytes(), nil
+}
+
+// lockrProblem turns a lockr failure into what to do about it. A credentials
+// failure (expired SSO session, no profile) says so plainly, since lockr's own
+// wording for it ("get identity: get credentials: ...") doesn't; anything else
+// (access denied, not found) is lockr's message as is. Either way the full
+// original text follows, never shortened.
+//
+// hint is the request's rendered login_hint, if the platform team set one; it
+// replaces the generic "log in to the account in Details" advice.
+func lockrProblem(err error, path, hint string) string {
+	msg := err.Error()
+	if isCredentialsError(msg) {
+		advice := "  Log in to the account this request is for (see Details above), then run status again."
+		if hint != "" {
+			advice = "  To log in: " + hint + ", then run status again."
+		}
+		return ui.Warning("You're not logged in to AWS"+awsProfileNote()+", or your session has expired.") + "\n" +
+			ui.Subtle(advice) + "\n" +
+			ui.Subtle("  lockr said: "+msg)
 	}
-	return secret.Value, nil
+	return ui.Warning("lockr couldn't read "+path+":") + "\n  " + msg
+}
+
+// isCredentialsError reports whether an AWS SDK error (as relayed by lockr) is
+// about having no usable credentials at all, rather than about the request.
+func isCredentialsError(msg string) bool {
+	for _, s := range []string{"get credentials", "get identity", "ExpiredToken", "SSO", "NoCredentialProviders", "failed to refresh cached credentials"} {
+		if strings.Contains(msg, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// loginHint renders pr's request's login_hint with the answers from its PR
+// Details (and the repo's maps), or "" if it has none or the request no longer
+// exists.
+func loginHint(pr ghclient.PRStatus, resources map[string]config.Resource, repos []*config.RepoConfig) string {
+	_, res, ok := requestInfo(pr, resources)
+	if !ok || res.LoginHint == "" {
+		return ""
+	}
+	values := map[string]string{}
+	for _, kv := range parseDetails(pr.Body) {
+		values[kv[0]] = kv[1]
+	}
+	return strings.TrimSpace(template.RenderString(res.LoginHint, values, remote.MapsFor(res, repos)))
+}
+
+// awsProfileNote names the AWS profile lockr will use, if one is set, so a
+// "wrong account" or "expired" message says which login it means.
+func awsProfileNote() string {
+	if p := os.Getenv("AWS_PROFILE"); p != "" {
+		return " (AWS profile " + p + ")"
+	}
+	return ""
 }
 
 // parseOutputsSection extracts the "### Outputs" section written by

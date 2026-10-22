@@ -28,6 +28,10 @@ func Resolve(orgCfg *OrgConfig, repo *RepoConfig) {
 		}
 		r.Resolved.Repo = targetRepo
 
+		if r.LoginHint == "" {
+			r.LoginHint = coalesce(repo.Defaults.LoginHint, orgCfg.Defaults.LoginHint)
+		}
+
 		// Target path: resource override → suffix appended to default → default alone
 		var targetPath string
 		if r.TargetPath != "" {

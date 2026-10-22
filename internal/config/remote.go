@@ -27,6 +27,8 @@ type ResourceDefaults struct {
 	TemplatePath    string `toml:"template_path"`
 	TemplateDirPath string `toml:"template_dir_path"`
 	BaseBranch      string `toml:"base_branch"`
+	// LoginHint is the default login_hint for every request (see Resource.LoginHint).
+	LoginHint string `toml:"login_hint"`
 	// Fields is a library of reusable field definitions, not fields every resource
 	// automatically gets. A resource opts in by declaring a field with the same
 	// Name and no Type of its own — see resolveFieldLibrary in resolver.go — at
@@ -96,6 +98,12 @@ type Resource struct {
 	// in `platformr status` (e.g. ["account", "where"] → "my-account · qa/use1"),
 	// read back from the PR's Details. Unset, status shows the PR title instead.
 	StatusFields []string `toml:"status_fields"`
+	// LoginHint tells someone how to log in to where this request's outputs live,
+	// shown when `platformr status` can't read them (e.g. "cloudctx {{.account}}").
+	// Rendered from the request's answers. platformr never picks credentials
+	// itself; this is only text the platform team writes. Falls back to
+	// [defaults] login_hint in platformr.toml, then in the org config.
+	LoginHint string `toml:"login_hint"`
 	// OutputPath is a platform-team-asserted contract, not something derived from the
 	// template: "once applied, outputs for this resource will be written under this path."
 	// Supports {{.field}} interpolation like TargetPath. IaC-agnostic and backend-agnostic —

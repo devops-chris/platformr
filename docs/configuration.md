@@ -410,6 +410,30 @@ change later, once something (`lockr` or otherwise) actually supports more
 than AWS. Shown alongside the outputs in `platformr status`. Ignored if
 `output_path` isn't set.
 
+### `login_hint` — how to log in to where the outputs live
+
+Optional. When `platformr status` can't read a request's outputs (no login,
+expired session, or nothing found where you're logged in), it shows this
+hint. Write whatever your team uses to get into the right account:
+
+```toml
+[defaults]
+login_hint = "cloudctx {{.account}}"
+```
+
+```
+You're not logged in to AWS (AWS profile pt/dev:admin), or your session has expired.
+  To log in: cloudctx pt-well-iq-dev-services, then run status again.
+```
+
+- It's filled in from the request's answers like `output_path`, and
+  `{{index .maps.<name> .field}}` works too (e.g. to show an account ID).
+- Set it once under `[defaults]` in the org config or `platformr.toml`, or
+  per request to override that.
+- platformr never chooses credentials or a role. This is only text you write.
+  Without it, the message says to log in to the account shown in the request's
+  Details.
+
 ### `instructions` — anything whoever handles this next should know
 
 Free text, shown in its own section of the PR body, right after the requestor's
