@@ -628,7 +628,7 @@ func lockrReadValue(path string) (string, error) {
 		return "", err
 	}
 	var secret lockrSecret
-	if err := json.Unmarshal(out, &secret); err != nil {
+	if err := json.Unmarshal(lockrJSON(out), &secret); err != nil {
 		return "", fmt.Errorf("unexpected lockr output: %w", err)
 	}
 	return secret.Value, nil
@@ -648,12 +648,28 @@ func lockrListNames(folder string) (map[string]bool, error) {
 	var items []struct {
 		Name string `json:"name"`
 	}
-	if start := bytes.IndexByte(out, '['); start != -1 && json.Unmarshal(out[start:], &items) == nil {
+	if clean := lockrJSON(out); len(clean) > 0 && clean[0] == '[' && json.Unmarshal(clean, &items) == nil {
 		for _, it := range items {
 			names[it.Name] = true
 		}
 	}
 	return names, nil
+}
+
+// ansiEscape matches terminal escape codes: CSI ("\x1b[?25l", colors, cursor moves) and
+// OSC ("\x1b]11;?\x1b\\").
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)`)
+
+// lockrJSON returns the JSON part of lockr's stdout. lockr can draw its "Fetching
+// secrets…" spinner on stdout even when that isn't a terminal, and the spinner's escape
+// codes start with "\x1b[", so looking for the first "[" found the spinner, not the JSON.
+// Escape codes are removed first; the JSON then starts at the first "[" or "{".
+func lockrJSON(out []byte) []byte {
+	clean := ansiEscape.ReplaceAll(out, nil)
+	if i := bytes.IndexAny(clean, "[{"); i >= 0 {
+		return clean[i:]
+	}
+	return clean
 }
 
 // runLockr runs lockr with args and returns its stdout. On failure the error is
