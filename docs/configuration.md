@@ -837,7 +837,17 @@ group_names = [{{range $i, $g := split "," .groups}}{{if $i}}, {{end}}"{{$g}}"{{
 ```
 
 At least one must be ticked unless `optional = true`. With `skip_if_empty = true` it
-isn't asked when there's nothing to list.
+isn't asked when there's nothing to list. For a `list`, that includes a list that's
+empty or isn't in the file at all, so a per-item list can be looked up by an earlier
+answer and simply skipped for items that don't have one:
+
+```toml
+list          = "locals.access.{{.prefix}}"   # e.g. locals.access.pt-ortho-tops
+update_file   = "cloud/aws/_common/twingate-groups.hcl"
+skip_if_empty = true                           # no entry for this prefix: not asked, value ""
+```
+
+A file that can't be read still stops the request.
 
 ### Static select
 

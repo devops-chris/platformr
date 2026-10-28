@@ -146,10 +146,12 @@ func (u *updateSession) prepareField(field config.Field, resource config.Resourc
 			return field, err
 		}
 		items, err := d.Items(p, field.Show)
-		if err != nil {
+		// skip_if_empty: a list that's empty or not there yet means "nothing to ask",
+		// e.g. a per-brand list for a brand that has none. Unreadable files still fail.
+		if err != nil && !(field.SkipIfEmpty && errors.Is(err, edit.ErrNotFound)) {
 			return field, fmt.Errorf("%s: %w", file, err)
 		}
-		if len(items) == 0 {
+		if len(items) == 0 && !field.SkipIfEmpty {
 			return field, fmt.Errorf("there's nothing in %s in %s to pick from", p, file)
 		}
 		field.Options, field.Source = items, ""
