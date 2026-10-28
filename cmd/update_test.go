@@ -322,6 +322,50 @@ func TestReadFromRefWhenNotOnBase(t *testing.T) {
 	}
 }
 
+// skip_if_empty on a list question: an empty or missing list skips the question
+// (e.g. a per-brand list for a brand with none) instead of stopping the request.
+func TestListSkipIfEmpty(t *testing.T) {
+	r, sess := testRequest(t, "sg-allow-ip")
+	files := map[string]string{"lists/access.hcl": "locals {\n  access = {\n    pt-ortho-tops = [\"developer\", \"developer-lead\"]\n    pt-chiro-ctc  = []\n  }\n}\n"}
+	sess.refName = "my-branch"
+	sess.fetchRef = func(p string) (string, error) {
+		if c, ok := files[p]; ok {
+			return c, nil
+		}
+		return "", errFileNotFound
+	}
+	field := func(list, file string, skip bool) config.Field {
+		return config.Field{Name: "roles", Type: "multiselect", List: list, UpdateFile: file, SkipIfEmpty: skip}
+	}
+
+	// A brand with a list: offered as usual, picked by an earlier answer.
+	f, err := sess.prepareField(field("locals.access.{{.prefix}}", "lists/access.hcl", true), r, map[string]string{"prefix": "pt-ortho-tops"})
+	if err != nil || strings.Join(f.Options, ",") != "developer,developer-lead" {
+		t.Fatalf("options %v err %v", f.Options, err)
+	}
+
+	// Missing or empty: nothing to offer, no error, so the prompt skips the question.
+	for _, prefix := range []string{"pt-well-iq", "pt-chiro-ctc"} {
+		f, err = sess.prepareField(field("locals.access.{{.prefix}}", "lists/access.hcl", true), r, map[string]string{"prefix": prefix})
+		if err != nil || len(f.Options) != 0 || f.Source != "" {
+			t.Errorf("%s: want no options and no error, got %v %v", prefix, f.Options, err)
+		}
+	}
+
+	// Without skip_if_empty both still stop the request.
+	if _, err = sess.prepareField(field("locals.access.pt-well-iq", "lists/access.hcl", false), r, map[string]string{}); err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Errorf("missing list without skip_if_empty: want not found, got %v", err)
+	}
+	if _, err = sess.prepareField(field("locals.access.pt-chiro-ctc", "lists/access.hcl", false), r, map[string]string{}); err == nil || !strings.Contains(err.Error(), "nothing in") {
+		t.Errorf("empty list without skip_if_empty: want nothing to pick from, got %v", err)
+	}
+
+	// A file that can't be read is never skipped.
+	if _, err = sess.prepareField(field("locals.access.pt-ortho-tops", "lists/missing.hcl", true), r, map[string]string{}); err == nil {
+		t.Error("missing file with skip_if_empty: want an error")
+	}
+}
+
 func TestFreeBranch(t *testing.T) {
 	taken := map[string]bool{"platformr/x": true, "platformr/x-2": true}
 	got, err := freeBranch("platformr/x", func(b string) (bool, error) { return taken[b], nil })

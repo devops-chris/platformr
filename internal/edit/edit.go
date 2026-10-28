@@ -8,6 +8,7 @@
 package edit
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"sort"
@@ -298,9 +299,13 @@ func Open(format Format, file string, content []byte) (Doc, error) {
 	return d, nil
 }
 
+// ErrNotFound is wrapped by every "key isn't there" error, so callers can tell a missing
+// key (often fine) from a file that couldn't be read (never fine): errors.Is(err, ErrNotFound).
+var ErrNotFound = errors.New("not found")
+
 // errNotFound builds the standard "key isn't there" error.
 func errNotFound(p Path, upTo int) error {
-	return fmt.Errorf("%s not found", p[:upTo+1].String())
+	return fmt.Errorf("%s %w", p[:upTo+1].String(), ErrNotFound)
 }
 
 // ── shared text helpers ──────────────────────────────────────────────────────────
