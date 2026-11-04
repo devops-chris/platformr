@@ -26,3 +26,28 @@ func TestTemplateFileWanted(t *testing.T) {
 		}
 	}
 }
+
+func TestTemplateFileValues(t *testing.T) {
+	r := config.Resource{TemplateFiles: []config.TemplateFileConfig{
+		{Name: "terragrunt.hcl", ForEach: "accounts", TargetPath: "cloud/aws/{{.each}}/zone/"},
+		{Name: "typo.hcl", ForEach: "acounts"},
+	}}
+
+	got, err := templateFileValues(r, "terragrunt.hcl", map[string]string{"accounts": "pt-a-prod, pt-a-dev,", "domain": "x.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0]["each"] != "pt-a-prod" || got[1]["each"] != "pt-a-dev" || got[1]["domain"] != "x.com" {
+		t.Errorf("one set of answers per item, with each set: got %v", got)
+	}
+
+	if got, _ := templateFileValues(r, "terragrunt.hcl", map[string]string{"accounts": ""}); len(got) != 0 {
+		t.Errorf("nothing ticked: want no files, got %v", got)
+	}
+	if got, _ := templateFileValues(r, "other.hcl", map[string]string{}); len(got) != 1 {
+		t.Errorf("no for_each: want the file once, got %v", got)
+	}
+	if _, err := templateFileValues(r, "typo.hcl", map[string]string{"accounts": "a"}); err == nil {
+		t.Error("for_each naming no question: want an error")
+	}
+}

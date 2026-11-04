@@ -174,34 +174,44 @@ func runRequest(cmd *cobra.Command, args []string) error {
 					// sourceName (unrendered) is the matching key against TemplateFiles config —
 					// unique on disk even when several files must render to the same outName.
 					sourceName := strings.TrimSuffix(tf.Name, ".tmpl")
-					if !templateFileWanted(resource, sourceName, values, resMaps) {
-						continue
-					}
-					rendered, err := template.Render(tf.Content, values, resMaps)
+					// for_each: the file is written once per item, with {{.each}} set to it.
+					eachValues, err := templateFileValues(resource, sourceName, values)
 					if err != nil {
-						tmplErr = fmt.Errorf("rendering %s: %w", tf.Name, err)
+						tmplErr = err
 						return
 					}
-					outName := template.RenderString(sourceName, values)
-					if skipPath := resolveSkipIfExists(resource, sourceName, values, resMaps); skipPath != "" {
-						var exists bool
-						exists, _ = gh.FileExists(resource.Resolved.Repo, skipPath, resource.Resolved.BaseBranch)
-						if exists {
-							skippedFiles = append(skippedFiles, outName)
+					for _, values := range eachValues {
+						if !templateFileWanted(resource, sourceName, values, resMaps) {
 							continue
 						}
+						rendered, err := template.Render(tf.Content, values, resMaps)
+						if err != nil {
+							tmplErr = fmt.Errorf("rendering %s: %w", tf.Name, err)
+							return
+						}
+						outName := template.RenderString(sourceName, values)
+						if skipPath := resolveSkipIfExists(resource, sourceName, values, resMaps); skipPath != "" {
+							var exists bool
+							exists, _ = gh.FileExists(resource.Resolved.Repo, skipPath, resource.Resolved.BaseBranch)
+							if exists {
+								skippedFiles = append(skippedFiles, outName)
+								continue
+							}
+						}
+						if override := resolveOutputName(resource, sourceName, values, resMaps); override != "" {
+							outName = override
+						}
+						// targetPath is rendered once above, before any {{.each}}: a for_each file
+						// sets its own target_path to land in a different place per item.
+						filePath := targetPath + outName
+						if override := resolveFileTargetPath(resource, sourceName, values, resMaps); override != "" {
+							filePath = override + outName
+						}
+						prFiles = append(prFiles, ghclient.PRFile{
+							Path:    filePath,
+							Content: rendered,
+						})
 					}
-					if override := resolveOutputName(resource, sourceName, values, resMaps); override != "" {
-						outName = override
-					}
-					filePath := targetPath + outName
-					if override := resolveFileTargetPath(resource, sourceName, values, resMaps); override != "" {
-						filePath = override + outName
-					}
-					prFiles = append(prFiles, ghclient.PRFile{
-						Path:    filePath,
-						Content: rendered,
-					})
 				}
 			} else {
 				// Single-file mode
@@ -737,6 +747,33 @@ func templateFileWanted(resource config.Resource, sourceName string, values map[
 		}
 	}
 	return true
+}
+
+// templateFileValues returns the answers to render a template file with: once as they are,
+// or, when its [[resources.template_files]] entry has for_each, once per comma-separated
+// item of that field's answer (e.g. each ticked option of a multiselect), with "each" set
+// to the item. An empty answer means the file isn't written at all.
+func templateFileValues(resource config.Resource, sourceName string, values map[string]string) ([]map[string]string, error) {
+	for _, tf := range resource.TemplateFiles {
+		if tf.Name != sourceName || tf.ForEach == "" {
+			continue
+		}
+		answer, ok := values[tf.ForEach]
+		if !ok {
+			return nil, fmt.Errorf("template file %q: for_each = %q, but the request has no question named %q", sourceName, tf.ForEach, tf.ForEach)
+		}
+		var out []map[string]string
+		for _, item := range strings.Split(answer, ",") {
+			if item = strings.TrimSpace(item); item == "" {
+				continue
+			}
+			v := copyMap(values)
+			v["each"] = item
+			out = append(out, v)
+		}
+		return out, nil
+	}
+	return []map[string]string{values}, nil
 }
 
 // resolveSkipIfExists returns the rendered skip_if_exists path for the given source

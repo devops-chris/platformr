@@ -179,6 +179,7 @@ type TemplateFileConfig struct {
 	OutputName   string `toml:"output_name"`    // overrides the rendered output filename (supports {{.field}} interpolation); use when the source filename can't just be the desired output name, e.g. multiple files that must all become "terragrunt.hcl"
 	SkipIfExists string `toml:"skip_if_exists"` // path in target repo; skip this file if it already exists
 	When         string `toml:"when"`           // Go template expression — the file is left out unless it renders "true"
+	ForEach      string `toml:"for_each"`       // a question's name: write this file once per comma-separated item of its answer (e.g. each ticked option), with {{.each}} set to the item
 }
 
 type Field struct {
