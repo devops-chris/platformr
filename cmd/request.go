@@ -168,51 +168,11 @@ func runRequest(cmd *cobra.Command, args []string) error {
 						resource.Resolved.TemplateDir, resource.Resolved.TemplateRepo, resource.Resolved.TemplateRef)
 					return
 				}
-				resMaps := remote.MapsFor(resource, repos)
-				targetPath := template.RenderString(resource.Resolved.TargetPath, values, resMaps)
-				for _, tf := range tmplFiles {
-					// sourceName (unrendered) is the matching key against TemplateFiles config —
-					// unique on disk even when several files must render to the same outName.
-					sourceName := strings.TrimSuffix(tf.Name, ".tmpl")
-					// for_each: the file is written once per item, with {{.each}} set to it.
-					eachValues, err := templateFileValues(resource, sourceName, values)
-					if err != nil {
-						tmplErr = err
-						return
-					}
-					for _, values := range eachValues {
-						if !templateFileWanted(resource, sourceName, values, resMaps) {
-							continue
-						}
-						rendered, err := template.Render(tf.Content, values, resMaps)
-						if err != nil {
-							tmplErr = fmt.Errorf("rendering %s: %w", tf.Name, err)
-							return
-						}
-						outName := template.RenderString(sourceName, values)
-						if skipPath := resolveSkipIfExists(resource, sourceName, values, resMaps); skipPath != "" {
-							var exists bool
-							exists, _ = gh.FileExists(resource.Resolved.Repo, skipPath, resource.Resolved.BaseBranch)
-							if exists {
-								skippedFiles = append(skippedFiles, outName)
-								continue
-							}
-						}
-						if override := resolveOutputName(resource, sourceName, values, resMaps); override != "" {
-							outName = override
-						}
-						// targetPath is rendered once above, before any {{.each}}: a for_each file
-						// sets its own target_path to land in a different place per item.
-						filePath := targetPath + outName
-						if override := resolveFileTargetPath(resource, sourceName, values, resMaps); override != "" {
-							filePath = override + outName
-						}
-						prFiles = append(prFiles, ghclient.PRFile{
-							Path:    filePath,
-							Content: rendered,
-						})
-					}
+				exists := func(p string) bool {
+					ok, _ := gh.FileExists(resource.Resolved.Repo, p, resource.Resolved.BaseBranch)
+					return ok
 				}
+				prFiles, skippedFiles, tmplErr = renderTemplateDir(resource, tmplFiles, values, remote.MapsFor(resource, repos), exists)
 			} else {
 				// Single-file mode
 				content, err := gh.FetchFile(resource.Resolved.TemplateRepo, resource.Resolved.Template, resource.Resolved.TemplateRef)
@@ -747,6 +707,54 @@ func templateFileWanted(resource config.Resource, sourceName string, values map[
 		}
 	}
 	return true
+}
+
+// renderTemplateDir renders a request's template files into the files of its PR, following
+// each file's [[resources.template_files]] entry (when, for_each, skip_if_exists,
+// output_name, target_path). exists reports whether a path is already in the target repo.
+// It returns the files to commit and the names of those skipped because they exist.
+func renderTemplateDir(resource config.Resource, tmplFiles []ghclient.TemplateFile, values map[string]string, resMaps map[string]map[string]string, exists func(string) bool) ([]ghclient.PRFile, []string, error) {
+	var prFiles []ghclient.PRFile
+	var skippedFiles []string
+	targetPath := template.RenderString(resource.Resolved.TargetPath, values, resMaps)
+	for _, tf := range tmplFiles {
+		// sourceName (unrendered) is the matching key against TemplateFiles config —
+		// unique on disk even when several files must render to the same outName.
+		sourceName := strings.TrimSuffix(tf.Name, ".tmpl")
+		// for_each: the file is written once per item, with {{.each}} set to it.
+		eachValues, err := templateFileValues(resource, sourceName, values)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, values := range eachValues {
+			if !templateFileWanted(resource, sourceName, values, resMaps) {
+				continue
+			}
+			rendered, err := template.Render(tf.Content, values, resMaps)
+			if err != nil {
+				return nil, nil, fmt.Errorf("rendering %s: %w", tf.Name, err)
+			}
+			outName := template.RenderString(sourceName, values)
+			if skipPath := resolveSkipIfExists(resource, sourceName, values, resMaps); skipPath != "" && exists(skipPath) {
+				skippedFiles = append(skippedFiles, outName)
+				continue
+			}
+			if override := resolveOutputName(resource, sourceName, values, resMaps); override != "" {
+				outName = override
+			}
+			// targetPath is rendered once above, before any {{.each}}: a for_each file
+			// sets its own target_path to land in a different place per item.
+			filePath := targetPath + outName
+			if override := resolveFileTargetPath(resource, sourceName, values, resMaps); override != "" {
+				filePath = override + outName
+			}
+			prFiles = append(prFiles, ghclient.PRFile{
+				Path:    filePath,
+				Content: rendered,
+			})
+		}
+	}
+	return prFiles, skippedFiles, nil
 }
 
 // templateFileValues returns the answers to render a template file with: once as they are,
