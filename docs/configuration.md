@@ -286,6 +286,27 @@ is printed). The other files still render and commit normally.
   when        = '{{if contains "datadog" .addons}}true{{end}}'
 ```
 
+**`for_each`** writes the file once per item of a question's answer, usually each
+option ticked in a `multiselect`. `{{.each}}` is the item, in the file and in
+`target_path`, `output_name`, `when` and `skip_if_exists`. Use it to put the same thing
+in several places at once:
+
+```toml
+  [[resources.fields]]
+  name   = "accounts"
+  type   = "multiselect"
+  label  = "Which accounts?"
+  source = "dirs:cloud/aws"
+
+  [[resources.template_files]]
+  name        = "terragrunt.hcl"
+  for_each    = "accounts"
+  target_path = "cloud/aws/{{.each}}/global/dns-zone/{{.domain}}/"
+```
+
+Nothing ticked means the file isn't written. Give each `for_each` file its own
+`target_path` with `{{.each}}` in it, or every copy lands in the same place.
+
 If every file in the directory is skipped, platformr exits with a message rather
 than opening an empty PR.
 
