@@ -72,6 +72,9 @@ type RepoConfig struct {
 	NoConfig bool   `toml:"-"`
 	RepoName string `toml:"-"` // full "owner/repo"
 	RepoRef  string `toml:"-"` // git ref this config was fetched from (empty = default branch)
+	// RefNotHere is the --ref / PLATFORMR_REF branch when this repo doesn't have it, so the
+	// repo was read at its configured ref (RepoRef) instead.
+	RefNotHere string `toml:"-"`
 }
 
 type Resource struct {

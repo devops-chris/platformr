@@ -92,6 +92,11 @@ This overrides the ref used for every configured repo for that one run. Preceden
 `--ref` flag > `PLATFORMR_REF` env var > the `ref` configured in the org config.
 Nobody else's runs are affected — the org config itself is untouched.
 
+A repo that doesn't have that branch is read at its configured ref instead, so a branch
+in one repo can be tried while its requests still read from the others (`repo = ...`).
+`platformr doctor` shows which ref each repo was read at, e.g.
+`(ref: default branch; no branch "my-test-branch" here)`.
+
 ### Branding
 
 Orgs can override the banner name and description shown when running `connect`
