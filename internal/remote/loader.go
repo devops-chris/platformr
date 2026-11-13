@@ -28,6 +28,24 @@ func refFor(configuredRef string) string {
 	return configuredRef
 }
 
+// RefFor is refFor for callers outside the loader (doctor's labels).
+func RefFor(configuredRef string) string { return refFor(configuredRef) }
+
+// fallbackRef decides whether a repo whose platformr.toml wasn't found at ref should be
+// read at its configured ref instead: only when ref came from --ref / PLATFORMR_REF (it
+// differs from the configured one) and the repo has no such branch. A branch that exists
+// but has no platformr.toml stays as it is (the repo really has no config there).
+func fallbackRef(ref, configuredRef string, branchExists func() (bool, error)) (string, bool) {
+	if ref == configuredRef {
+		return "", false
+	}
+	exists, err := branchExists()
+	if err != nil || exists {
+		return "", false
+	}
+	return configuredRef, true
+}
+
 // Loader fetches and parses platformr configs from GitHub at runtime.
 // No local config files are needed beyond the connected org name.
 type Loader struct {
@@ -57,19 +75,29 @@ func (l *Loader) LoadAll(orgName string) (*config.OrgConfig, []*config.RepoConfi
 
 		ref := refFor(repoRef.Ref)
 		repoCfg, err := l.loadRepoConfig(repoURL, ref)
+		// --ref is usually a branch in just one of the repos. The others are read at their
+		// own ref, or every file_lookup / dirs: into them would 404 on the missing branch.
+		refNotHere := ""
+		if github.IsNotFound(err) {
+			if fallback, ok := fallbackRef(ref, repoRef.Ref, func() (bool, error) { return l.gh.BranchExists(repoURL, ref) }); ok {
+				refNotHere, ref = ref, fallback
+				repoCfg, err = l.loadRepoConfig(repoURL, ref)
+			}
+		}
 		if err != nil {
 			// A repo without a platformr.toml has no requests of its own, but other repos'
 			// requests can still read from it, so it stays in the list (quietly).
 			// Anything else (usually a typo) hides all of its requests, so say so.
 			if github.IsNotFound(err) {
 				owner, _, _ := strings.Cut(repoURL, "/")
-				repos = append(repos, &config.RepoConfig{NoConfig: true, RepoName: repoURL, RepoOwner: owner, RepoRef: ref})
+				repos = append(repos, &config.RepoConfig{NoConfig: true, RepoName: repoURL, RepoOwner: owner, RepoRef: ref, RefNotHere: refNotHere})
 			} else {
 				l.Warnings = append(l.Warnings, fmt.Sprintf(
 					"%s: platformr.toml couldn't be read, so none of its requests are shown. Fix it and try again.\n  %v", repoURL, err))
 			}
 			continue
 		}
+		repoCfg.RefNotHere = refNotHere
 		l.loadRequestFiles(repoCfg)
 
 		config.Resolve(orgCfg, repoCfg)

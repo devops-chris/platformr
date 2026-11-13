@@ -145,16 +145,26 @@ func runDoctor(_ *cobra.Command, _ []string) error {
 
 	for _, ref := range orgCfg.Repos {
 		repoURL := remote.ResolveRepoURL(ref.URL, orgCfg.GitHub.DefaultOrg)
-		refLabel := ref.Ref
+		// The ref actually read: --ref / PLATFORMR_REF, or the configured one when this
+		// repo doesn't have that branch.
+		usedRef := remote.RefFor(ref.Ref)
+		repo, ok := loaded[repoURL]
+		if ok {
+			usedRef = repo.RepoRef
+		}
+		refLabel := usedRef
 		if refLabel == "" {
 			refLabel = "default branch"
 		}
+		if ok && repo.RefNotHere != "" {
+			refLabel += fmt.Sprintf("; no branch %q here", repo.RefNotHere)
+		}
 		label := fmt.Sprintf("%s (ref: %s)", repoURL, refLabel)
 
-		if repo, ok := loaded[repoURL]; ok && repo.NoConfig {
+		if ok && repo.NoConfig {
 			hint := "Fine if other repos' requests only read from it. If it should have requests, add platformr.toml"
-			if ref.Ref != "" {
-				hint += fmt.Sprintf(" (and check that ref %q exists and is pushed)", ref.Ref)
+			if usedRef != "" {
+				hint += fmt.Sprintf(" (and check that ref %q exists and is pushed)", usedRef)
 			}
 			warn(label+" — no platformr.toml, no requests of its own", hint+".")
 		} else if ok {
@@ -170,12 +180,12 @@ func runDoctor(_ *cobra.Command, _ []string) error {
 			}
 		} else {
 			// Repo failed to load — probe to give a specific hint
-			_, err := gh.FetchFile(repoURL, "platformr.toml", ref.Ref)
+			_, err := gh.FetchFile(repoURL, "platformr.toml", usedRef)
 			if err != nil {
 				hint := fmt.Sprintf("Error: %v", err)
 				if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "Not Found") {
-					if ref.Ref != "" {
-						hint = fmt.Sprintf("platformr.toml not found on ref %q.\nCheck that the branch exists and has been pushed.", ref.Ref)
+					if usedRef != "" {
+						hint = fmt.Sprintf("platformr.toml not found on ref %q.\nCheck that the branch exists and has been pushed.", usedRef)
 					} else {
 						hint = "platformr.toml not found in the repo root."
 					}
