@@ -540,6 +540,7 @@ func runUpdate(resource config.Resource, repos []*config.RepoConfig, values map[
 	if prErr != nil {
 		return fmt.Errorf("creating PR: %w", withAuthHint(prErr, binaryName))
 	}
+	lastPRURL = prURL
 	fmt.Println(ui.Success("PR opened: " + hyperlink(prURL)))
 	return nil
 }

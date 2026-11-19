@@ -108,6 +108,17 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	return runResource(resource, repos, gh, ghWrite, binaryName, nil)
+}
+
+// lastPRURL is the PR the last request opened ("" if it opened none), so a guide can
+// show a step as waiting on it straight away, before GitHub search has indexed it.
+var lastPRURL string
+
+// runResource asks resource's questions and opens its PR, or runs it as a guide.
+// presets answers questions up front (a guide's answers): those aren't asked.
+func runResource(resource config.Resource, repos []*config.RepoConfig, gh, ghWrite *ghclient.Client, binaryName string, presets map[string]string) error {
+	lastPRURL = ""
 	fmt.Println(requestHeader(resource))
 
 	// Change requests edit existing files instead of rendering templates.
@@ -124,9 +135,13 @@ func runRequest(cmd *cobra.Command, args []string) error {
 	}
 
 	// Collect field values
-	values, err := collectFields(resource, repos, gh, sess)
+	values, err := collectFields(resource, repos, gh, sess, presets)
 	if err != nil {
 		return err
+	}
+
+	if resource.IsGuide() {
+		return runGuide(resource, values, repos, gh, ghWrite, binaryName)
 	}
 
 	if sess != nil && !resource.RendersTemplates() {
@@ -300,6 +315,7 @@ func runRequest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating PR: %w", withAuthHint(prErr, binaryName))
 	}
 
+	lastPRURL = prURL
 	fmt.Println(ui.Success("PR opened: " + hyperlink(prURL)))
 	printOutputPath(resource, values, repos)
 	return nil
@@ -378,7 +394,7 @@ func withAuthHint(err error, binaryName string) error {
 	return err
 }
 
-func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, sess *updateSession) (map[string]string, error) {
+func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghclient.Client, sess *updateSession, presets map[string]string) (map[string]string, error) {
 	values := make(map[string]string)
 
 	for _, field := range resource.Fields {
@@ -404,6 +420,13 @@ func collectFields(resource config.Resource, repos []*config.RepoConfig, gh *ghc
 				return nil, err
 			}
 			values[field.Name] = val
+			continue
+		}
+
+		// Answered by the guide this request was started from: not asked again.
+		if v, ok := presetAnswer(field, presets); ok {
+			values[field.Name] = v
+			fmt.Println(ui.Subtle(fmt.Sprintf("  %s: %s", presetLabel(field), presetShown(v))))
 			continue
 		}
 

@@ -192,6 +192,9 @@ func requestHeader(r config.Resource) string {
 	if r.IsChange() {
 		kind = "change"
 	}
+	if r.IsGuide() {
+		kind = "guide"
+	}
 	h := "\n  " + ui.SectionHeader(r.Label()) + "  " + ui.Subtle(config.CategoryOf(r)+" · "+kind) + "\n"
 	if r.Description != "" {
 		h += "  " + ui.Subtle(r.Description) + "\n"
