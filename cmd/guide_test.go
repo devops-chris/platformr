@@ -261,3 +261,17 @@ func TestGuideRendersNoTemplates(t *testing.T) {
 		t.Errorf("a guide has no template folder, got %q", d)
 	}
 }
+
+func TestRenderInstructionsHasPRBranch(t *testing.T) {
+	values := map[string]string{"account": "a"}
+	got := renderInstructions("git switch {{.pr_branch}}\ncd cloud/aws/{{.account}}", values, "platformr/vpc-a", nil)
+	if got != "git switch platformr/vpc-a\ncd cloud/aws/a" {
+		t.Errorf("got %q", got)
+	}
+	if _, ok := values["pr_branch"]; ok {
+		t.Error("pr_branch must not be added to the answers (it would show in Details)")
+	}
+	if renderInstructions("", values, "b", nil) != "" {
+		t.Error("no instructions: nothing")
+	}
+}

@@ -303,7 +303,7 @@ func runResource(resource config.Resource, repos []*config.RepoConfig, gh, ghWri
 				Branch:        branch,
 				BaseBranch:    resource.Resolved.BaseBranch,
 				Title:         template.RenderString(resource.PRTitle, values, remote.MapsFor(resource, repos)),
-				Body:          buildPRBody(resource.Name, values, comment, template.RenderString(resource.Instructions, values, remote.MapsFor(resource, repos)), changesMarkdown(editChanges)+outputSectionMarkdown(resource, values, repos)),
+				Body:          buildPRBody(resource.Name, values, comment, renderInstructions(resource.Instructions, values, branch, remote.MapsFor(resource, repos)), changesMarkdown(editChanges)+outputSectionMarkdown(resource, values, repos)),
 				Files:         prFiles,
 				Reviewers:     reviewers,
 				TeamReviewers: teamReviewers,
@@ -892,6 +892,18 @@ func printDryRun(resource config.Resource, values map[string]string, files []ghc
 // the requestor's own context, then what to actually do about this PR, then the
 // raw field dump (reference material, not usually the first thing anyone needs),
 // then outputs (only relevant once it's actually applied/reconciled/whatever).
+// renderInstructions renders a request's instructions with its answers plus pr_branch,
+// the PR's branch, so they can say exactly what to check out. pr_branch is only for
+// instructions: it isn't an answer, so it stays out of Details.
+func renderInstructions(instructions string, values map[string]string, branch string, maps map[string]map[string]string) string {
+	if instructions == "" {
+		return ""
+	}
+	v := copyMap(values)
+	v["pr_branch"] = branch
+	return template.RenderString(instructions, v, maps)
+}
+
 func buildPRBody(resourceName string, values map[string]string, comment string, instructions string, outputSection string) string {
 	body := fmt.Sprintf("## %s request\n\nOpened via `%s`\n", resourceName, filepath.Base(os.Args[0]))
 	if comment != "" {
