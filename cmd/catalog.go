@@ -175,9 +175,24 @@ func printSchemaHuman(r *config.Resource) error {
 		ui.Subtle(r.Description),
 	)
 
-	fmt.Printf("  %s %s\n", labelStyle.Render("PR target:"), r.Resolved.Repo+"/"+r.Resolved.TargetPath)
-	fmt.Printf("  %s %s\n", labelStyle.Render("Template:"), r.Resolved.TemplateRepo+"/"+r.Resolved.Template)
-	fmt.Printf("  %s %s\n", labelStyle.Render("Base branch:"), r.Resolved.BaseBranch)
+	if r.IsGuide() {
+		// A guide opens no PR: what it has is its steps, each another request.
+		for i, s := range r.Steps {
+			label := ""
+			if i == 0 {
+				label = "Steps:"
+			}
+			line := fmt.Sprintf("%d. %s → %s", i+1, s.Title, s.Request)
+			if s.Optional {
+				line += "  " + ui.Subtle("(optional)")
+			}
+			fmt.Printf("  %s %s\n", labelStyle.Render(label), line)
+		}
+	} else {
+		fmt.Printf("  %s %s\n", labelStyle.Render("PR target:"), r.Resolved.Repo+"/"+r.Resolved.TargetPath)
+		fmt.Printf("  %s %s\n", labelStyle.Render("Template:"), r.Resolved.TemplateRepo+"/"+r.Resolved.Template)
+		fmt.Printf("  %s %s\n", labelStyle.Render("Base branch:"), r.Resolved.BaseBranch)
+	}
 	if r.OutputPath != "" {
 		outputs := r.OutputPath
 		if len(r.OutputKeys) > 0 {

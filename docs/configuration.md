@@ -567,6 +567,12 @@ reports the same problems for every request. If a platformr PR changing the same
 is still open, the request stops and links to it. If nothing would change, no PR is
 opened.
 
+### Guides: several requests in order
+
+A request with `[[resources.steps]]` is a **guide**: it asks its questions once, then shows
+each step's request with whether it's done, waiting on an open PR, or next, and starts the
+one picked with those answers filled in. It opens no PR itself. See [Guides](guides.md).
+
 ---
 
 ## Resource display names

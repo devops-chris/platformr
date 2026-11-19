@@ -143,6 +143,11 @@ type Resource struct {
 	// Changes are collection edits (append / remove / put / delete) and file deletions
 	// made by a change request, in order, after the questions are answered.
 	Changes []ChangeConfig `toml:"changes"`
+	// Steps makes this a guide instead of a request: its questions are asked once,
+	// then it shows each step's request in order with whether it's done, waiting on
+	// an open PR, or next, and starts the one picked with those answers filled in.
+	// It opens no PR itself. See docs/guides.md.
+	Steps []StepConfig `toml:"steps"`
 	// Resolved is populated by the resolver after loading. Do not set in TOML.
 	Resolved ResolvedResource `toml:"-"`
 }
@@ -273,12 +278,37 @@ type ChangeConfig struct {
 	IfExists string `toml:"if_exists"`
 }
 
+// StepConfig is one [[resources.steps]] entry of a guide. Every string supports {{.field}}
+// with the guide's answers.
+type StepConfig struct {
+	// Title is the step's name in the checklist, e.g. "Network".
+	Title string `toml:"title"`
+	// Request is the name of the request this step runs (from any connected repo).
+	Request string `toml:"request"`
+	// DoneWhen is a path in the step request's repo, on the branch its PRs target, that
+	// exists once the step is done: a file or folder, or "dirs:<path>" for "a folder
+	// with at least one folder in it" (e.g. any VPC). Empty: never shown as done.
+	DoneWhen string `toml:"done_when"`
+	// Optional steps are offered but never the "next" one.
+	Optional bool `toml:"optional"`
+	// When leaves the step out unless it renders "true", like a field's when.
+	When string `toml:"when"`
+	// Hint is a short line shown next to the step, e.g. "only with a team domain".
+	Hint string `toml:"hint"`
+}
+
+// IsGuide reports whether this is a guide (it has steps) rather than a request.
+func (r Resource) IsGuide() bool { return len(r.Steps) > 0 }
+
 // RendersTemplates reports whether this request creates files from templates. A
 // plain create request does; a change request does only if it names templates
 // itself (template, template_dir or template_files), so one request can create new
 // files and edit existing ones in the same PR, e.g. a new account's folder plus its
-// entry in the organization's account list.
+// entry in the organization's account list. A guide never does.
 func (r Resource) RendersTemplates() bool {
+	if r.IsGuide() {
+		return false
+	}
 	return !r.IsUpdate() || r.Template != "" || r.TemplateDir != "" || len(r.TemplateFiles) > 0
 }
 
