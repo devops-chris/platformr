@@ -530,7 +530,7 @@ func runUpdate(resource config.Resource, repos []*config.RepoConfig, values map[
 				Branch:        branch,
 				BaseBranch:    resource.Resolved.BaseBranch,
 				Title:         template.RenderString(resource.PRTitle, values, maps),
-				Body:          buildPRBody(resource.Name, values, comment, template.RenderString(resource.Instructions, values, maps), changesMarkdown(changes)+outputSectionMarkdown(resource, values, repos)),
+				Body:          buildPRBody(resource.Name, values, comment, renderInstructions(resource.Instructions, values, branch, maps), changesMarkdown(changes)+outputSectionMarkdown(resource, values, repos)),
 				Files:         files,
 				Reviewers:     reviewers,
 				TeamReviewers: teamReviewers,

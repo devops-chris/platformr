@@ -482,6 +482,24 @@ Supports `{{.field}}` interpolation like `output_path`. Absent means no
 section is shown — most resources probably don't need one; it's for the cases
 where "just merge it" isn't actually the whole story.
 
+`{{.pr_branch}}` is the PR's branch, so the instructions can say exactly what to check
+out. Writing commands one per line, without `&&` or environment variables, keeps them
+copy-pasteable in bash, zsh, PowerShell and cmd alike:
+
+~~~toml
+instructions = '''
+```
+git fetch origin
+git switch {{.pr_branch}}
+cd cloud/aws/{{.account}}/{{.where}}/vpc/{{.name}}
+terragrunt run-all apply
+```
+'''
+~~~
+
+`pr_branch` is only for instructions: it isn't one of the request's answers, so it
+doesn't show in the PR's Details.
+
 ### Change requests: editing existing files
 
 A request with `update_file`, a question with `key` or `list`, or any
