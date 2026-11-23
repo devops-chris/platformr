@@ -52,3 +52,32 @@ func TestInMenuOrder(t *testing.T) {
 		t.Errorf("uncategorized request not in %q", Uncategorized)
 	}
 }
+
+func TestInMenuOrderGuideThenItsSteps(t *testing.T) {
+	rs := []Resource{
+		{Name: "ecr", Category: "Env"},
+		{Name: "eks", Category: "Env"},
+		{Name: "other", Category: "Env"},
+		{Name: "env", Category: "Env", Steps: []StepConfig{{Request: "vpc"}, {Request: "eks"}, {Request: "elsewhere"}, {Request: "ecr"}}},
+		{Name: "vpc", Category: "Env"},
+		{Name: "upgrade", Category: "Env", Action: "change"},
+		{Name: "elsewhere", Category: "Other"},
+	}
+	creates, changes := InMenuOrder(rs, "Env")
+	var got []string
+	for _, r := range creates {
+		got = append(got, r.Name)
+	}
+	if strings.Join(got, ",") != "env,vpc,eks,ecr,other" {
+		t.Errorf("creates = %v, want the guide, its steps in step order (only this category's), then the rest", got)
+	}
+	if len(changes) != 1 || changes[0].Name != "upgrade" {
+		t.Errorf("changes = %v", changes)
+	}
+
+	// No guide: definition order, as before.
+	creates, _ = InMenuOrder(rs[:3], "Env")
+	if creates[0].Name != "ecr" || creates[2].Name != "other" {
+		t.Errorf("without a guide the order shouldn't change: %v", creates)
+	}
+}

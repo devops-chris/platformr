@@ -639,28 +639,27 @@ account-location  #289  Merged  pt-well-iq-dev-services · qa/use1
 
 ## The request menu: categories and actions
 
-The menu asks about the **group** first (a kind of thing like Kubernetes, or an audience
-like Platform team), then whether you're creating something new or changing something
-that already exists, then which request:
+The menu shows the **groups** first, then (only in a group with both kinds) whether
+you're creating something new or changing something that already exists, then which
+request. Running `request` already says you need something, so the first step is just
+the list. Groups work best named for what people need (an AWS account, an environment, a
+database) rather than for the technology or who usually does it:
 
 ```
-? What do you need?
-  > Network         VPC and remote access into it
-    Kubernetes      EKS clusters
-    Platform team   Accounts and account-wide setup
-? Kubernetes: what do you want to do?
-  > Create something new
-    Change something that already exists
-? Kubernetes: change something that already exists
-  > Upgrade its Kubernetes version
-    Scale its node group
+  > An AWS account                For a new team or product
+    An environment                Somewhere to run apps: dev, qa, prod, …
+    A database                    PostgreSQL (Aurora)
+    Change something that exists  Upgrades, access, settings
+? An environment
+  > Set up an environment, step by step
+    Just the network (VPC and Twingate)
+    Just a cluster (EKS)
 ```
 
-The category step is skipped when there's only one category, and the second question
-only appears when a category has both kinds of request. The request list is always
-shown once an earlier step was asked, even with one request, so you see what you're
-starting and can go back. Once a request is picked, its name, menu group and
-description are shown above its questions.
+Each step is skipped when there's only one choice: one category skips the first, the
+second only appears when a category has both kinds of request, and a category (or kind)
+with a single request starts it straight away. Once a request is picked, its name, menu
+group and description are shown above its questions.
 
 From the second step on, the last choice is **← Back**, and **Esc** does the same:
 it returns to the previous step that was asked, starting on what was picked there.
@@ -702,7 +701,9 @@ The menu lives in the org config because it spans every connected repo: one plac
 next to the list of repos it draws from. A single-repo setup can put `[[categories]]`
 in that repo's `platformr.toml` instead; categories there are added after the org
 config's (a name already in the org config keeps the org config's order and hint).
-Within each list, requests appear in the order they're defined.
+Within each list, requests appear in the order they're defined, except that a
+[guide](guides.md) comes first, followed by its steps' requests in the same category in
+step order (the guide already says what order they go in).
 
 `action` only sorts the menu. What a request actually does still comes from
 its settings (templates for new files, `update_file` for changes; see

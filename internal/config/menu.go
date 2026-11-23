@@ -52,11 +52,17 @@ func MenuCategories(resources []Resource, declared []CategoryConfig) []CategoryC
 
 // InMenuOrder returns the requests in one category: creates first, then changes, each
 // in the order they're defined.
+//
+// A guide comes first, followed by its steps' requests that are in the same category, in
+// step order (the guide already says what order they go in), then the rest.
 func InMenuOrder(resources []Resource, category string) (creates, changes []Resource) {
+	var in []Resource
 	for _, r := range resources {
-		if CategoryOf(r) != category {
-			continue
+		if CategoryOf(r) == category {
+			in = append(in, r)
 		}
+	}
+	for _, r := range guideOrder(in) {
 		if r.IsChange() {
 			changes = append(changes, r)
 		} else {
@@ -64,4 +70,34 @@ func InMenuOrder(resources []Resource, category string) (creates, changes []Reso
 		}
 	}
 	return creates, changes
+}
+
+// guideOrder puts each guide first, each followed by its steps' requests from rs in step
+// order, then the remaining requests in their original order.
+func guideOrder(rs []Resource) []Resource {
+	byName := map[string]int{}
+	for i, r := range rs {
+		byName[r.Name] = i
+	}
+	placed := make([]bool, len(rs))
+	var out []Resource
+	for i, r := range rs {
+		if !r.IsGuide() {
+			continue
+		}
+		out = append(out, r)
+		placed[i] = true
+		for _, s := range r.Steps {
+			if j, ok := byName[s.Request]; ok && !placed[j] {
+				out = append(out, rs[j])
+				placed[j] = true
+			}
+		}
+	}
+	for i, r := range rs {
+		if !placed[i] {
+			out = append(out, r)
+		}
+	}
+	return out
 }

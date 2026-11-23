@@ -45,23 +45,23 @@ func TestWalkMenu(t *testing.T) {
 		want    string
 		asked   string
 	}{
-		{"straight through", []string{"Kubernetes", "change", "eks-upgrade"}, "eks-upgrade",
-			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||Kubernetes: change something that already exists|back|"},
-		{"a single request is still shown, with Back", []string{"Database", "rds"}, "rds",
-			"What do you need?|noback|Network|Database: create something new|back|"},
-		{"back from a single-request list", []string{"Database", "BACK", "Kubernetes", "change", "eks-upgrade"}, "eks-upgrade",
-			"What do you need?|noback|Network|Database: create something new|back||What do you need?|noback|Database|Kubernetes: what do you want to do?|back||Kubernetes: change something that already exists|back|"},
+		// The first step has no question (running `request` already says you need something).
+		// A one-request list isn't shown: the request starts straight away.
+		{"straight through", []string{"Kubernetes", "change"}, "eks-upgrade",
+			"|noback|Network|Kubernetes: what do you want to do?|back|"},
+		{"a category with one request starts it", []string{"Database"}, "rds",
+			"|noback|Network"},
 		{"back from new/change to the thing, starting on the last pick",
 			[]string{"Kubernetes", "BACK", "Network", "twingate"}, "twingate",
-			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||What do you need?|noback|Kubernetes|Network: create something new|back|"},
+			"|noback|Network|Kubernetes: what do you want to do?|back|||noback|Kubernetes|Network|back|"},
 		{"back from the list skips the unasked new/change step",
-			[]string{"Network", "BACK", "Database", "rds"}, "rds",
-			"What do you need?|noback|Network|Network: create something new|back||What do you need?|noback|Network|Database: create something new|back|"},
+			[]string{"Network", "BACK", "Database"}, "rds",
+			"|noback|Network|Network|back|||noback|Network"},
 		{"back from the list to new/change, starting on the last pick",
-			[]string{"Kubernetes", "create", "BACK", "change", "eks-upgrade"}, "eks-upgrade",
-			"What do you need?|noback|Network|Kubernetes: what do you want to do?|back||Kubernetes: create something new|back||Kubernetes: what do you want to do?|back|create|Kubernetes: change something that already exists|back|"},
+			[]string{"Kubernetes", "create", "BACK", "change"}, "eks-upgrade",
+			"|noback|Network|Kubernetes: what do you want to do?|back||Kubernetes: create something new|back||Kubernetes: what do you want to do?|back|create"},
 	}
-	// "create" in Kubernetes has one request, so it's picked without a list; use a second one
+	// "create" in Kubernetes has one request, so it's started without a list; use a second one
 	// for the back-from-list case.
 	res := append(append([]config.Resource{}, menuResources...), config.Resource{Name: "eks-addon", Category: "Kubernetes"})
 	for _, c := range cases {
