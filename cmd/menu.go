@@ -24,9 +24,11 @@ type menuOption struct{ label, hint, value string }
 type askFunc func(title string, opts []menuOption, canBack bool, current string) (string, error)
 
 // pickResource walks the menu: the thing (category), then "create or change" when that
-// category has both, then the request. The category and create/change steps are skipped
-// when there's only one choice; the request list is always shown once an earlier step was
-// asked. From the second step on, "← Back" (or Esc) returns to the previous step asked.
+// category has both, then the request. Each step is skipped when there's only one choice:
+// a category with one request starts it straight away (its header says what started).
+// From the second step on, "← Back" (or Esc) returns to the previous step asked.
+// Running `request` already says you need something, so the first step has no question,
+// only the list.
 func pickResource(all []config.Resource, categories []config.CategoryConfig) (config.Resource, error) {
 	return walkMenu(all, categories, askMenu)
 }
@@ -54,7 +56,7 @@ func walkMenu(all []config.Resource, categories []config.CategoryConfig, ask ask
 					}
 					opts[i] = menuOption{c.Name, hint, c.Name}
 				}
-				v, err := ask("What do you need?", opts, false, category)
+				v, err := ask("", opts, false, category)
 				if err != nil {
 					return config.Resource{}, err
 				}
@@ -88,17 +90,22 @@ func walkMenu(all []config.Resource, categories []config.CategoryConfig, ask ask
 			step = 2
 
 		case 2: // the request
-			list, title := creates, category+": create something new"
+			list, title := creates, category
 			if kind == change {
-				list, title = changes, category+": change something that already exists"
+				list = changes
 			}
-			// A single request is still shown once an earlier step was asked, so the person
-			// sees what they're starting and can go back. Picked silently only when the
-			// whole menu is that one request.
-			canBack := askKind || askCategory
-			if len(list) == 1 && !canBack {
+			if askKind {
+				title = category + ": create something new"
+				if kind == change {
+					title = category + ": change something that already exists"
+				}
+			}
+			// Only one request here: start it (its header says what started) rather than
+			// show a list of one.
+			if len(list) == 1 {
 				return list[0], nil
 			}
+			canBack := askKind || askCategory
 			opts := make([]menuOption, len(list))
 			for i, r := range list {
 				opts[i] = menuOption{r.Label(), r.Description, r.Name}
